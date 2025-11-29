@@ -81,15 +81,17 @@ class CPU65816 {
     func step() {
         let address = UInt32(pb) << 16 | UInt32(pc)
         let opcode = memory.read8(address)
-        
+
         instructionCount += 1
-        
-        // Debug mais detalhado
-        print("[\(instructionCount)] PC: \(String(format: "$%02X:%04X", pb, pc)) Opcode: \(String(format: "$%02X", opcode))")
-        
+
+        // Debug mais detalhado (descomente para debug)
+        // if instructionCount % 1000 == 0 {
+        //     print("[\(instructionCount)] PC: \(String(format: "$%02X:%04X", pb, pc)) Opcode: \(String(format: "$%02X", opcode))")
+        // }
+
         // Incrementa PC com overflow correto
         pc = (pc &+ 1) & 0xFFFF
-        
+
         executeInstruction(opcode)
     }
     
@@ -97,11 +99,10 @@ class CPU65816 {
     private func fetchByte() -> UInt8 {
         let address = UInt32(pb) << 16 | UInt32(pc)
         let byte = memory.read8(address)
-        print("fetchByte em PC: \(String(format: "$%04X", pc)) = \(String(format: "$%02X", byte))")
-        
+
         // Incrementa PC com overflow correto
         pc = (pc &+ 1) & 0xFFFF
-        
+
         return byte
     }
     
@@ -142,8 +143,50 @@ class CPU65816 {
     // Executa instrução
     private func executeInstruction(_ opcode: UInt8) {
         switch opcode {
+            // Load A
+        case 0xA9: LDA_immediate()          // LDA #
+        case 0xA5: // LDA dp
+            let addr = getDirectPageAddress()
+            a = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
+            updateNZ(a)
+        case 0xB5: // LDA dp,X
+            let addr = getDirectPageXAddress()
+            a = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
+            updateNZ(a)
+        case 0xAD: // LDA abs
+            let addr = getAbsoluteAddress()
+            a = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
+            updateNZ(a)
+        case 0xBD: // LDA abs,X
+            let addr = getAbsoluteXAddress()
+            a = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
+            updateNZ(a)
+        case 0xB9: // LDA abs,Y
+            let addr = getAbsoluteYAddress()
+            a = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
+            updateNZ(a)
+        case 0xAF: // LDA long
+            let addr = fetchLong()
+            a = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
+            updateNZ(a)
+        case 0xBF: // LDA long,X
+            let addr = fetchLong() + UInt32(x)
+            a = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
+            updateNZ(a)
+        case 0xA7: // LDA [dp]
+            let addr = getIndirectLongAddress()
+            a = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
+            updateNZ(a)
+        case 0xA1: // LDA (dp,X)
+            let addr = getIndexedIndirectAddress()
+            a = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
+            updateNZ(a)
         case 0xB1: // LDA (dp),Y
             let addr = getIndirectIndexedAddress()
+            a = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
+            updateNZ(a)
+        case 0xB7: // LDA [dp],Y
+            let addr = getIndirectIndexedLongAddress()
             a = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
             updateNZ(a)
         case 0xA3: // LDA sr,S
@@ -985,43 +1028,46 @@ class CPU65816 {
         case 0xB8: CLV()                    // CLV
         case 0xC2: REP()                    // REP
         case 0xE2: SEP()                    // SEP
-            
+        case 0xEA: break                    // NOP
+
             // Misc Operations
-        case 0x44: // MVP (Block Move)
+        case 0x44: // MVP (Block Move Negative)
             let dest = fetchByte()
             let src = fetchByte()
-            
-            // Move byte from src to dest
-            let srcAddr = UInt32(src) << 16 | UInt32(x)
-            let destAddr = UInt32(dest) << 16 | UInt32(y)
-            let value = memory.read8(srcAddr)
-            memory.write8(destAddr, value)
-            
-            // Update registers
-            if a != 0xFFFF {
+
+            // Move all bytes at once (optimization)
+            while a != 0xFFFF {
+                let srcAddr = UInt32(src) << 16 | UInt32(x)
+                let destAddr = UInt32(dest) << 16 | UInt32(y)
+                let value = memory.read8(srcAddr)
+                memory.write8(destAddr, value)
+
                 a = a &- 1
                 x = x &- 1
                 y = y &- 1
-                pc = pc &- 3  // Repeat instruction
+
+                // Add cycles per byte
+                cycles += 7
             }
             db = dest
             
-        case 0x54: // MVN (Block Move)
+        case 0x54: // MVN (Block Move Positive)
             let dest = fetchByte()
             let src = fetchByte()
-            
-            // Move byte from src to dest
-            let srcAddr = UInt32(src) << 16 | UInt32(x)
-            let destAddr = UInt32(dest) << 16 | UInt32(y)
-            let value = memory.read8(srcAddr)
-            memory.write8(destAddr, value)
-            
-            // Update registers
-            if a != 0xFFFF {
+
+            // Move all bytes at once (optimization)
+            while a != 0xFFFF {
+                let srcAddr = UInt32(src) << 16 | UInt32(x)
+                let destAddr = UInt32(dest) << 16 | UInt32(y)
+                let value = memory.read8(srcAddr)
+                memory.write8(destAddr, value)
+
                 a = a &- 1
                 x = x &+ 1
                 y = y &+ 1
-                pc = pc &- 3  // Repeat instruction
+
+                // Add cycles per byte
+                cycles += 7
             }
             db = dest
             
@@ -1071,15 +1117,10 @@ class CPU65816 {
     // MARK: - Helper Functions
     
     private func fetchLong() -> UInt32 {
-        print("fetchLong() chamado em PC: \(String(format: "$%02X:%04X", pb, pc))")
         let low = UInt32(fetchByte())
-        print("  low byte: \(String(format: "$%02X", low)), PC agora: \(String(format: "$%04X", pc))")
         let mid = UInt32(fetchByte())
-        print("  mid byte: \(String(format: "$%02X", mid)), PC agora: \(String(format: "$%04X", pc))")
         let high = UInt32(fetchByte())
-        print("  high byte: \(String(format: "$%02X", high)), PC agora: \(String(format: "$%04X", pc))")
         let result = (high << 16) | (mid << 8) | low
-        print("  resultado: \(String(format: "$%06X", result))")
         return result
     }
 
@@ -1966,6 +2007,16 @@ class CPU65816 {
     private func getDirectPageYAddress() -> UInt32 {
         let offset = fetchByte()
         return UInt32(d &+ UInt16(offset) &+ y)
+    }
+
+    private func LDA_immediate() {
+        if getFlag(.memory) {
+            a = (a & 0xFF00) | UInt16(fetchByte())
+            updateNZ8(UInt8(a & 0xFF))
+        } else {
+            a = fetchWord()
+            updateNZ16(a)
+        }
     }
 
     private func LDX_immediate() {

@@ -4,7 +4,7 @@ import Foundation
 class SNES {
     // Componentes principais
     var cpu: CPU65816
-    var ppu: PPU
+    public var ppu: PPU
     var apu: APU
     var memory: MemoryBus
     

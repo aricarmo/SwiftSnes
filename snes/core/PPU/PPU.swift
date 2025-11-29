@@ -340,6 +340,7 @@ class PPU {
         case 0x00:  // INIDISP - Display control
             brightness = value & 0x0F
             let forceBlank = (value & 0x80) != 0
+            print("[PPU] INIDISP escrito: \(String(format: "$%02X", value)) - Brightness: \(brightness), ForceBlank: \(forceBlank)")
             ppu1OpenBus = value
             
         case 0x01:  // OBSEL - Object size and data
@@ -381,6 +382,7 @@ class PPU {
             bgConfig[1].tileSize = (value & 0x20) != 0
             bgConfig[2].tileSize = (value & 0x40) != 0
             bgConfig[3].tileSize = (value & 0x80) != 0
+            print("[PPU] BGMODE escrito: Modo \(screenMode)")
             ppu1OpenBus = value
             
         case 0x06:  // MOSAIC - Mosaic size and enable
@@ -527,6 +529,7 @@ class PPU {
             bgEnabled[2] = (value & 0x04) != 0
             bgEnabled[3] = (value & 0x08) != 0
             objEnabled = (value & 0x10) != 0
+            print("[PPU] TM (Main screen) escrito: \(String(format: "$%02X", value)) - BG1:\(bgEnabled[0]) BG2:\(bgEnabled[1]) BG3:\(bgEnabled[2]) BG4:\(bgEnabled[3]) OBJ:\(objEnabled)")
             ppu1OpenBus = value
             
         case 0x2D:  // TS - Sub screen designation
@@ -641,45 +644,68 @@ class PPU {
     // Renderiza uma scanline
     private func renderScanline(_ line: Int) {
         guard line < 224 else { return }
-        
+
+        // Se force blank está ativo, não renderiza nada
+        let forceBlank = (registers[0x00] & 0x80) != 0
+
         // Implementação básica de renderização
         let baseOffset = line * 256 * 4
-        
+
         for x in 0..<256 {
             let offset = baseOffset + x * 4
-            
-            // Cor temporária de fundo
-            var r: UInt8 = 0
-            var g: UInt8 = 0
-            var b: UInt8 = 0
-            
+
+            if forceBlank {
+                // Tela preta quando force blank está ativo
+                frameBuffer[offset] = 0
+                frameBuffer[offset + 1] = 0
+                frameBuffer[offset + 2] = 0
+                frameBuffer[offset + 3] = 255
+                continue
+            }
+
+            // Cor de backdrop (cor 0 da paleta)
+            var (r, g, b) = getColorFromCGRAM(0)
+
             // Renderiza backgrounds baseado no modo
             switch screenMode {
             case 0:  // Mode 0: 4 BGs de 2bpp
                 if bgEnabled[0] { (r, g, b) = renderBGPixel(0, x, line) }
-                
-            case 1:  // Mode 1: 3 BGs
+                else if bgEnabled[1] { (r, g, b) = renderBGPixel(1, x, line) }
+
+            case 1:  // Mode 1: 3 BGs (mais comum no Super Mario World)
+                // BG3 (mais ao fundo)
+                if bgEnabled[2] { (r, g, b) = renderBGPixel(2, x, line) }
+                // BG2 (meio)
+                if bgEnabled[1] { (r, g, b) = renderBGPixel(1, x, line) }
+                // BG1 (frente)
                 if bgEnabled[0] { (r, g, b) = renderBGPixel(0, x, line) }
-                
+
             case 7:  // Mode 7
                 if bgEnabled[0] { (r, g, b) = renderMode7Pixel(x, line) }
-                
+
             default:
-                break
+                // Para outros modos, tenta renderizar BG1
+                if bgEnabled[0] { (r, g, b) = renderBGPixel(0, x, line) }
             }
-            
+
             // Aplica brilho
-            r = UInt8(min(255, Int(r) * Int(brightness + 1) / 16))
-            g = UInt8(min(255, Int(g) * Int(brightness + 1) / 16))
-            b = UInt8(min(255, Int(b) * Int(brightness + 1) / 16))
-            
+            if brightness > 0 {
+                r = UInt8(min(255, Int(r) * Int(brightness) / 15))
+                g = UInt8(min(255, Int(g) * Int(brightness) / 15))
+                b = UInt8(min(255, Int(b) * Int(brightness) / 15))
+            } else {
+                r = 0
+                g = 0
+                b = 0
+            }
+
             // Escreve no frame buffer
             frameBuffer[offset] = r
             frameBuffer[offset + 1] = g
             frameBuffer[offset + 2] = b
             frameBuffer[offset + 3] = 255
         }
-        
+
         // Renderiza sprites
         if objEnabled {
             renderSprites(line)
