@@ -12,6 +12,7 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
       - name: Select Xcode 26
         run: |
           ls -d /Applications/Xcode*.app

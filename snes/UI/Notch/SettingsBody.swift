@@ -16,6 +16,7 @@ struct SettingsBody: View {
     @ObservedObject var bindings: KeyBindings
     @ObservedObject var padBindings: GamepadBindings
     @ObservedObject var gamepad: GamepadInput
+    @ObservedObject var updater: UpdateChecker
 
     let panelWidth: CGFloat
     let onQuit: () -> Void
@@ -81,6 +82,10 @@ struct SettingsBody: View {
                              detail: "Ignora hover, expande apenas ao clicar",
                              isOn: $settings.clickToOpen)
 
+            Divider().overlay(NotchPalette.divider)
+            SectionLabel("ATUALIZAÇÃO")
+            UpdateStatusRow(updater: updater)
+
             HStack {
                 Button("Restaurar controles", action: restoreDefaults)
                     .buttonStyle(.plain)
@@ -98,7 +103,10 @@ struct SettingsBody: View {
         .padding(.bottom, NotchMetrics.contentPadding)
         .padding(.top, 4)
         .frame(width: panelWidth, alignment: .leading)
-        .onAppear { if gamepad.isConnected { source = .gamepad } }
+        .onAppear {
+            if gamepad.isConnected { source = .gamepad }
+            updater.markSeen()
+        }
         .onChange(of: source) { _, _ in
             presenter.rebindingButton = nil
             presenter.rebindingPadButton = nil
@@ -334,6 +342,90 @@ private struct ScreenSizeCard: View {
             )
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct UpdateStatusRow: View {
+    @ObservedObject var updater: UpdateChecker
+
+    private var detail: (text: String, color: Color) {
+        switch updater.state {
+        case .idle:
+            return ("Ainda não verificado", NotchPalette.primaryText.opacity(0.4))
+        case .checking:
+            return ("Verificando…", NotchPalette.primaryText.opacity(0.4))
+        case .upToDate(let date):
+            let ago = RelativeDateTimeFormatter()
+            ago.locale = Locale(identifier: "pt_BR")
+            ago.unitsStyle = .short
+            return ("Você está na versão mais recente · \(ago.localizedString(for: date, relativeTo: Date()))",
+                    NotchPalette.primaryText.opacity(0.4))
+        case .available(let release):
+            var text = "Nova versão \(release.version)"
+            if let summary = release.summary { text += " · \(summary)" }
+            return (text, NotchPalette.accentBright)
+        case .failed:
+            return ("Não foi possível verificar", NotchPalette.error)
+        }
+    }
+
+    var body: some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("NotchSnes")
+                        .font(.system(size: 12))
+                        .foregroundStyle(NotchPalette.primaryText.opacity(0.85))
+                    Text("v\(updater.currentVersion)")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(NotchPalette.primaryText.opacity(0.38))
+                }
+                Text(detail.text)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(detail.color)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            Spacer(minLength: 8)
+            switch updater.state {
+            case .checking:
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(NotchPalette.primaryText.opacity(0.5))
+            case .available(let release):
+                Button(action: updater.openDownloadPage) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.down.to.line")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text("Baixar \(release.version)")
+                            .font(.system(size: 11))
+                    }
+                    .foregroundStyle(NotchPalette.accentBright)
+                    .padding(.horizontal, 10)
+                    .frame(height: 24)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(NotchPalette.accent.opacity(0.22))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .strokeBorder(NotchPalette.accentSoft.opacity(0.55), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+            default:
+                Button("Verificar", action: updater.check)
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11))
+                    .foregroundStyle(NotchPalette.accentSoft)
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 36)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.white.opacity(0.05))
+        )
     }
 }
 

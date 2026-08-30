@@ -12,6 +12,7 @@ struct NotchRootView: View {
     @ObservedObject var padBindings: GamepadBindings
     @ObservedObject var gamepad: GamepadInput
     @ObservedObject var recents: RecentROMs
+    @ObservedObject var updater: UpdateChecker
 
     let panelWidth: CGFloat
     let headerHeight: CGFloat
@@ -53,7 +54,7 @@ struct NotchRootView: View {
 
     init(vm: EmulatorViewModel, presenter: NotchPresenter, settings: NotchSettings,
          bindings: KeyBindings, padBindings: GamepadBindings, gamepad: GamepadInput,
-         recents: RecentROMs,
+         recents: RecentROMs, updater: UpdateChecker,
          panelWidth: CGFloat, headerHeight: CGFloat, notchGap: CGFloat,
          onQuit: @escaping () -> Void) {
         self.vm = vm
@@ -63,6 +64,7 @@ struct NotchRootView: View {
         self.padBindings = padBindings
         self.gamepad = gamepad
         self.recents = recents
+        self.updater = updater
         self.panelWidth = panelWidth
         self.headerHeight = headerHeight
         self.notchGap = notchGap
@@ -87,7 +89,7 @@ struct NotchRootView: View {
 
     private var panelContent: some View {
         VStack(spacing: 0) {
-            NotchHeader(vm: vm, presenter: presenter, gamepad: gamepad,
+            NotchHeader(vm: vm, presenter: presenter, gamepad: gamepad, updater: updater,
                         panelWidth: panelWidth, headerHeight: headerHeight, notchGap: notchGap)
             // ZStack e não o if/else solto no VStack: enquanto a troca de corpo
             // anima, o SwiftUI mantém a view que sai ocupando lugar no layout.
@@ -98,14 +100,14 @@ struct NotchRootView: View {
             ZStack(alignment: .top) {
                 if presenter.showsSettings {
                     SettingsBody(presenter: presenter, settings: settings, bindings: bindings,
-                                 padBindings: padBindings, gamepad: gamepad,
+                                 padBindings: padBindings, gamepad: gamepad, updater: updater,
                                  panelWidth: panelWidth, onQuit: onQuit)
                         .transition(.opacity)
                 } else if vm.isROMLoaded {
                     GameBody(vm: vm, presenter: presenter, gamepad: gamepad, videoSize: videoSize)
                         .transition(.opacity)
                 } else {
-                    EmptyDropBody(vm: vm, recents: recents, panelWidth: panelWidth)
+                    EmptyDropBody(vm: vm, recents: recents, updater: updater, panelWidth: panelWidth)
                         .transition(.opacity)
                 }
             }

@@ -64,6 +64,7 @@ final class NotchWindowController {
             padBindings: padBindings,
             gamepad: gamepad,
             recents: RecentROMs.shared,
+            updater: UpdateChecker.shared,
             panelWidth: width,
             headerHeight: header,
             notchGap: NotchMetrics.notchWidth(on: currentScreen),
@@ -120,6 +121,7 @@ final class NotchWindowController {
 
         observeState()
         observeActivation()
+        UpdateChecker.shared.start()
         installHoverMonitor()
         installKeyMonitor()
         installClickMonitor()
@@ -241,7 +243,8 @@ final class NotchWindowController {
             gamepad.$controller.map { _ in () }.eraseToAnyPublisher(),
             gamepad.$batteryLevel.map { _ in () }.eraseToAnyPublisher(),
             gamepad.$justConnected.map { _ in () }.eraseToAnyPublisher(),
-            RecentROMs.shared.objectWillChange.map { _ in () }.eraseToAnyPublisher()
+            RecentROMs.shared.objectWillChange.map { _ in () }.eraseToAnyPublisher(),
+            UpdateChecker.shared.objectWillChange.map { _ in () }.eraseToAnyPublisher()
         )
         // `objectWillChange` dispara antes da mutação: adia um ciclo para ler o
         // estado já atualizado.

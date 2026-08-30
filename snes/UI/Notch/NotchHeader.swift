@@ -7,6 +7,7 @@ struct NotchHeader: View {
     @ObservedObject var vm: EmulatorViewModel
     @ObservedObject var presenter: NotchPresenter
     @ObservedObject var gamepad: GamepadInput
+    @ObservedObject var updater: UpdateChecker
 
     let panelWidth: CGFloat
     let headerHeight: CGFloat
@@ -26,7 +27,7 @@ struct NotchHeader: View {
                 .frame(width: sideWidth, alignment: .leading)
             Spacer(minLength: 0)
                 .frame(width: notchGap)
-            NotchHeaderTrailing(vm: vm, presenter: presenter, gamepad: gamepad)
+            NotchHeaderTrailing(vm: vm, presenter: presenter, gamepad: gamepad, updater: updater)
                 .frame(width: sideWidth, alignment: .trailing)
         }
         .padding(.horizontal, Self.horizontalPadding)
@@ -90,13 +91,19 @@ private struct NotchHeaderTrailing: View {
     @ObservedObject var vm: EmulatorViewModel
     @ObservedObject var presenter: NotchPresenter
     @ObservedObject var gamepad: GamepadInput
+    @ObservedObject var updater: UpdateChecker
+
+    /// Lilás enquanto houver update que o usuário ainda não viu nos ajustes.
+    private var gearColor: Color {
+        updater.available != nil && !updater.seen ? NotchPalette.accentSoft : Color.white.opacity(0.45)
+    }
 
     var body: some View {
         if !vm.isROMLoaded {
             Button(action: openSettings) {
                 Image(systemName: "gearshape")
                     .font(.system(size: 11))
-                    .foregroundStyle(Color.white.opacity(0.45))
+                    .foregroundStyle(gearColor)
             }
             .buttonStyle(.plain)
         } else if vm.isRunning {

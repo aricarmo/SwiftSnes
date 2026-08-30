@@ -6,11 +6,16 @@ import SwiftUI
 struct EmptyDropBody: View {
     @ObservedObject var vm: EmulatorViewModel
     @ObservedObject var recents: RecentROMs
+    @ObservedObject var updater: UpdateChecker
 
     let panelWidth: CGFloat
 
     var body: some View {
         VStack(spacing: 12) {
+            if let release = updater.available {
+                UpdateAvailableRow(version: release.version, action: updater.openDownloadPage)
+            }
+
             DropZone(action: vm.showFileDialog)
 
             if !recents.entries.isEmpty {
@@ -27,6 +32,39 @@ struct EmptyDropBody: View {
         .padding(.horizontal, NotchMetrics.contentPadding)
         .padding(.bottom, NotchMetrics.contentPadding)
         .frame(width: panelWidth)
+    }
+}
+
+private struct UpdateAvailableRow: View {
+    let version: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Image(systemName: "arrow.down.to.line")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(NotchPalette.accentSoft)
+                Text("NotchSnes \(version) disponível")
+                    .font(.system(size: 12))
+                    .foregroundStyle(NotchPalette.primaryText.opacity(0.9))
+                Spacer()
+                Text("Baixar")
+                    .font(.system(size: 11))
+                    .foregroundStyle(NotchPalette.accentBright)
+            }
+            .padding(.horizontal, 9)
+            .frame(height: 28)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(NotchPalette.accent.opacity(0.14))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(NotchPalette.accentSoft.opacity(0.35), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 
