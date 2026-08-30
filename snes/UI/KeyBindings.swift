@@ -23,10 +23,13 @@ struct SNESButton: Identifiable, Hashable {
     static let r      = SNESButton(id: "r",      label: "R",         mask: 0x0010)
     static let start  = SNESButton(id: "start",  label: "Start",     mask: 0x1000)
     static let select = SNESButton(id: "select", label: "Select",    mask: 0x2000)
+    /// Não é um botão do console: abre a fita de voltar no tempo. Máscara zero,
+    /// então nunca chega ao joypad.
+    static let rewind = SNESButton(id: "rewind", label: "Voltar no tempo", mask: 0)
 
-    static let all: [SNESButton] = [up, down, left, right, a, b, x, y, l, r, start, select]
+    static let all: [SNESButton] = [up, down, left, right, a, b, x, y, l, r, start, select, rewind]
     /// Ordem exibida no painel de ajustes, em duas colunas.
-    static let displayOrder: [SNESButton] = [b, start, a, select, y, l, x, r]
+    static let displayOrder: [SNESButton] = [b, start, a, select, y, l, x, r, rewind]
 }
 
 @MainActor
@@ -48,13 +51,19 @@ final class KeyBindings: ObservableObject {
         "a": 7,       // X
         "x": 1,       // S
         "l": 12,      // Q
-        "r": 13       // W
+        "r": 13,      // W
+        "rewind": 51  // Delete (⌫)
     ]
 
     private init() {
         let stored = defaults.dictionary(forKey: defaultsKey) as? [String: Int]
-        let pairs = stored?.compactMapValues { UInt16(exactly: $0) } ?? KeyBindings.factory
-        rebuild(from: pairs.isEmpty ? KeyBindings.factory : pairs)
+        var pairs = stored?.compactMapValues { UInt16(exactly: $0) } ?? KeyBindings.factory
+        if pairs.isEmpty { pairs = KeyBindings.factory }
+        // Botões novos (ex.: voltar no tempo) ganham a tecla padrão se ela estiver livre.
+        for (id, code) in KeyBindings.factory where pairs[id] == nil && !pairs.values.contains(code) {
+            pairs[id] = code
+        }
+        rebuild(from: pairs)
     }
 
     private func rebuild(from pairs: [String: UInt16]) {

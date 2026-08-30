@@ -11,6 +11,20 @@ final class NotchPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
+/// A janela fica sempre na altura expandida, mas só a faixa visível do painel
+/// deve receber o mouse: fora dela o hitTest devolve nil e o clique cai na
+/// janela de baixo (o `contentShape` do SwiftUI não basta — a NSHostingView
+/// engole o evento de qualquer forma).
+final class PassthroughContainerView: NSView {
+    var interactiveRect: () -> NSRect = { .zero }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let local = convert(point, from: superview)
+        guard interactiveRect().contains(local) else { return nil }
+        return super.hitTest(point)
+    }
+}
+
 @MainActor
 final class NotchWindowController {
     private let panel: NotchPanel
@@ -30,6 +44,9 @@ final class NotchWindowController {
     private var cancellables = Set<AnyCancellable>()
     private var previousApp: NSRunningApplication?
     private var pressedButtons: UInt16 = 0
+    /// Última máscara do controle vista pela fita: só bordas de subida navegam.
+    private var rewindPadMask: UInt16 = 0
+    private var rewindRepeat: Timer?
     private var hadROM = false
     /// Altura do conteúdo desenhado. A janela pode estar maior que isso enquanto anima.
     private var contentHeight: CGFloat = 0
@@ -99,11 +116,12 @@ final class NotchWindowController {
         // (`updateAnimatedWindowSize`) quando o tamanho ideal do conteúdo muda —
         // ao trocar o tamanho de tela nos ajustes ele alargava a janela mantendo
         // o X, e o painel saía do centro do notch. A geometria é só nossa.
-        let container = NSView(frame: NSRect(origin: .zero, size: panel.frame.size))
+        let container = PassthroughContainerView(frame: NSRect(origin: .zero, size: panel.frame.size))
         hostingController.view.frame = container.bounds
         hostingController.view.autoresizingMask = [.width, .height]
         container.addSubview(hostingController.view)
         panel.contentView = container
+        container.interactiveRect = { [weak self] in self?.interactiveRect ?? .zero }
         panel.isOpaque = false
         panel.backgroundColor = .clear
         // Sem sombra: junto dela o macOS desenha o hairline claro na moldura da
@@ -160,6 +178,17 @@ final class NotchWindowController {
         return NSRect(x: frame.midX - width / 2, y: frame.maxY - contentHeight,
                       width: width, height: contentHeight)
             .insetBy(dx: -4, dy: -4)
+    }
+
+    /// Mesma faixa do `hotRect`, em coordenadas da contentView (origem embaixo).
+    private var interactiveRect: NSRect {
+        guard let bounds = panel.contentView?.bounds else { return .zero }
+        let width = presenter.showsHeader
+            ? bodyWidth
+            : NotchMetrics.collapsedWidth(panelWidth: panelWidth,
+                                          notchGap: NotchMetrics.notchWidth(on: screen))
+        return NSRect(x: bounds.midX - width / 2, y: bounds.maxY - contentHeight,
+                      width: width, height: contentHeight)
     }
 
     /// O painel é sempre desenhado inteiro e recortado a partir do topo; quem
@@ -236,6 +265,8 @@ final class NotchWindowController {
             viewModel.$isRunning.map { _ in () }.eraseToAnyPublisher(),
             viewModel.$errorText.map { _ in () }.eraseToAnyPublisher(),
             viewModel.$isPresentingDialog.map { _ in () }.eraseToAnyPublisher(),
+            viewModel.$rewind.map { _ in () }.eraseToAnyPublisher(),
+            viewModel.$resumeNotice.map { _ in () }.eraseToAnyPublisher(),
             presenter.objectWillChange.map { _ in () }.eraseToAnyPublisher(),
             settings.objectWillChange.map { _ in () }.eraseToAnyPublisher(),
             bindings.objectWillChange.map { _ in () }.eraseToAnyPublisher(),
@@ -267,6 +298,10 @@ final class NotchWindowController {
         // ROM recém-carregada: já entra fixado, senão o jogo pausaria assim que o cursor saísse.
         if viewModel.isROMLoaded && !hadROM {
             presenter.isPinned = true
+        }
+        if viewModel.isROMLoaded && !hadROM {
+            // Novo console: reenvia o que já está pressionado (teclado ou controle).
+            pushJoypad()
         }
         hadROM = viewModel.isROMLoaded
         // Só atribui quando muda: @Published notifica mesmo com valor igual,
@@ -310,6 +345,11 @@ final class NotchWindowController {
             previousApp = NSWorkspace.shared.frontmostApplication
             NSApp.activate(ignoringOtherApps: true)
             panel.makeKeyAndOrderFront(nil)
+        } else if needsKeyboard, !panel.isKeyWindow {
+            // App já ativo mas sem janela key (o NSOpenPanel acabou de fechar,
+            // ou o clique veio num painel non-activating): sem key window o
+            // teclado não chega ao jogo até o usuário trocar de app e voltar.
+            panel.makeKeyAndOrderFront(nil)
         } else if !needsKeyboard, NSApp.isActive {
             // Soltando o teclado: zera o joypad, senão a tecla presa na saída
             // fica marcada até o próximo keyUp que nunca chega.
@@ -329,7 +369,76 @@ final class NotchWindowController {
 
     /// Teclado e controle somam: soltar um não apaga o outro.
     private func pushJoypad() {
+        // Com a fita aberta o controle navega nela; o console não recebe nada.
+        if viewModel.rewind != nil {
+            navigateRewind(padMask: gamepad.pressed)
+            viewModel.setJoypad(0)
+            return
+        }
+        rewindPadMask = 0
+        stopRewindRepeat()
         viewModel.setJoypad(pressedButtons | gamepad.pressed)
+    }
+
+    // MARK: - Fita de voltar no tempo
+
+    /// Passo por toque nas setas / d-pad: uma miniatura (2 s). Fino: meio segundo.
+    private static let rewindStep = 20
+    private static let rewindFineStep = 5
+    private static let rewindRepeatInterval: TimeInterval = 0.2
+
+    private func navigateRewind(padMask mask: UInt16) {
+        let pressed = mask & ~rewindPadMask
+        rewindPadMask = mask
+        if pressed & SNESButton.left.mask != 0 { viewModel.rewindStep(-Self.rewindStep); startRewindRepeat(-Self.rewindStep) }
+        if pressed & SNESButton.right.mask != 0 { viewModel.rewindStep(Self.rewindStep); startRewindRepeat(Self.rewindStep) }
+        // L / R: ajuste fino de meio segundo.
+        if pressed & SNESButton.l.mask != 0 { viewModel.rewindStep(-Self.rewindFineStep); startRewindRepeat(-Self.rewindFineStep) }
+        if pressed & SNESButton.r.mask != 0 { viewModel.rewindStep(Self.rewindFineStep); startRewindRepeat(Self.rewindFineStep) }
+        let holding = SNESButton.left.mask | SNESButton.right.mask | SNESButton.l.mask | SNESButton.r.mask
+        if mask & holding == 0 { stopRewindRepeat() }
+        // Layout SNES: B (embaixo) confirma, A (direita) cancela.
+        if pressed & SNESButton.b.mask != 0 { viewModel.rewindConfirm() }
+        if pressed & SNESButton.a.mask != 0 { viewModel.rewindCancel() }
+    }
+
+    /// O d-pad não repete sozinho como o teclado: segurar continua andando.
+    private func startRewindRepeat(_ delta: Int) {
+        stopRewindRepeat()
+        let timer = Timer(timeInterval: Self.rewindRepeatInterval, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.viewModel.rewind != nil else { self?.stopRewindRepeat(); return }
+                self.viewModel.rewindStep(delta)
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        rewindRepeat = timer
+    }
+
+    private func stopRewindRepeat() {
+        rewindRepeat?.invalidate()
+        rewindRepeat = nil
+    }
+
+    /// Teclas com a fita aberta. Devolve nil quando consumiu o evento.
+    private func handleRewindKey(_ event: NSEvent) -> NSEvent? {
+        guard event.type == .keyDown else { return nil }
+        let fine = event.modifierFlags.contains(.shift)
+        let step = fine ? Self.rewindFineStep : Self.rewindStep
+        switch Int(event.keyCode) {
+        case kVK_LeftArrow: viewModel.rewindStep(-step)
+        case kVK_RightArrow: viewModel.rewindStep(step)
+        case kVK_Return, kVK_ANSI_KeypadEnter: viewModel.rewindConfirm()
+        case kVK_Escape: viewModel.rewindCancel()
+        default:
+            guard let button = bindings.map[event.keyCode] else { return event }
+            switch button {
+            case .b: viewModel.rewindConfirm()
+            case .a, .rewind: viewModel.rewindCancel()
+            default: break
+            }
+        }
+        return nil
     }
 
     private func observeGamepad() {
@@ -337,6 +446,11 @@ final class NotchWindowController {
         gamepad.onPressedChange = { [weak self] _ in
             guard let self, presenter.rebindingPadButton == nil, !presenter.showsSettings else { return }
             pushJoypad()
+        }
+        gamepad.onRewindPressed = { [weak self] in
+            guard let self, presenter.rebindingPadButton == nil, !presenter.showsSettings,
+                  presenter.isOpen else { return }
+            viewModel.toggleRewind()
         }
         gamepad.$controller
             .receive(on: DispatchQueue.main)
@@ -368,8 +482,13 @@ final class NotchWindowController {
     private func installHoverMonitor() {
         hoverMonitor = NotchHoverMonitor { [weak self] location in
             guard let self else { return }
+            let inside = hotRect.contains(location)
+            // A janela ocupa a altura expandida mesmo recolhida; fora da faixa
+            // visível ela precisa ignorar o mouse, senão engole cliques que
+            // deveriam ir para a janela de baixo (hitTest nil não basta).
+            if panel.ignoresMouseEvents == inside { panel.ignoresMouseEvents = !inside }
             if settings.clickToOpen && !presenter.isOpen { return }
-            presenter.cursorInsideChanged(hotRect.contains(location))
+            presenter.cursorInsideChanged(inside)
         }
     }
 
@@ -405,6 +524,10 @@ final class NotchWindowController {
             return nil
         }
 
+        if viewModel.rewind != nil, presenter.needsKeyboard, !presenter.showsSettings {
+            return handleRewindKey(event)
+        }
+
         if event.type == .keyDown && event.keyCode == UInt16(kVK_Escape) {
             if presenter.rebindingPadButton != nil {
                 presenter.rebindingPadButton = nil
@@ -418,6 +541,11 @@ final class NotchWindowController {
 
         guard presenter.needsKeyboard, !presenter.showsSettings,
               let button = bindings.map[event.keyCode] else { return event }
+
+        if button == .rewind {
+            if event.type == .keyDown, !event.isARepeat { viewModel.toggleRewind() }
+            return nil
+        }
 
         if event.type == .keyDown {
             pressedButtons |= button.mask

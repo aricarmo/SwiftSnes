@@ -1,3 +1,4 @@
+import AppKit
 //  GamepadInput.swift
 //  Controle físico (GameController.framework) -> bits do joypad ($4218).
 //  O mapeamento é configurável e persistido, no mesmo molde de KeyBindings.
@@ -73,13 +74,19 @@ final class GamepadBindings: ObservableObject {
     private static let factory: [String: GamepadElement] = [
         "b": .buttonA, "a": .buttonB, "y": .buttonX, "x": .buttonY,
         "l": .leftShoulder, "r": .rightShoulder,
-        "start": .menu, "select": .options
+        "start": .menu, "select": .options,
+        // O SNES não tem L2: o gatilho nunca colide com um jogo.
+        "rewind": .leftTrigger
     ]
 
     private init() {
         let stored = (defaults.dictionary(forKey: defaultsKey) as? [String: String])?
             .compactMapValues { GamepadElement(rawValue: $0) }
-        rebuild(from: stored?.isEmpty == false ? stored! : GamepadBindings.factory)
+        var pairs = stored?.isEmpty == false ? stored! : GamepadBindings.factory
+        for (id, element) in GamepadBindings.factory where pairs[id] == nil && !pairs.values.contains(element) {
+            pairs[id] = element
+        }
+        rebuild(from: pairs)
     }
 
     private func rebuild(from pairs: [String: GamepadElement]) {
@@ -122,6 +129,9 @@ final class GamepadInput: ObservableObject {
     private(set) var pressed: UInt16 = 0
     /// Chamado a cada mudança da máscara, ainda no evento do controle.
     var onPressedChange: ((UInt16) -> Void)?
+    /// Botão de voltar no tempo acabou de ser pressionado (borda de subida).
+    var onRewindPressed: (() -> Void)?
+    private var rewindHeld = false
     /// Nível de bateria 0...1, se o controle informar.
     @Published private(set) var batteryLevel: Float?
     /// Mostra "conectado" na pílula recolhida por alguns segundos após parear.
@@ -144,6 +154,10 @@ final class GamepadInput: ObservableObject {
     init() {
         bindings = .shared
         settings = .shared
+        // Fixado com controle, o app devolve o foco ao app anterior de propósito
+        // (não rouba o teclado): sem isto o GameController não entrega eventos
+        // a um app em segundo plano e o joystick parece morto.
+        GCController.shouldMonitorBackgroundEvents = true
         let center = NotificationCenter.default
         observers.append(center.addObserver(forName: .GCControllerDidConnect, object: nil, queue: .main) { [weak self] note in
             MainActor.assumeIsolated { self?.attach(note.object as? GCController, announce: true) }
@@ -175,6 +189,7 @@ final class GamepadInput: ObservableObject {
         controller = nil
         batteryLevel = nil
         pressed = 0
+        rewindHeld = false
         // Outro controle ainda ligado assume.
         attach(GCController.controllers().first { $0.extendedGamepad != nil }, announce: false)
     }
@@ -202,8 +217,14 @@ final class GamepadInput: ObservableObject {
         if level != batteryLevel { batteryLevel = level }
 
         var mask: UInt16 = 0
+        var rewindNow = false
         for (element, button) in bindings.map where element.input(in: pad)?.isPressed == true {
             mask |= button.mask
+            if button == .rewind { rewindNow = true }
+        }
+        if rewindNow != rewindHeld {
+            rewindHeld = rewindNow
+            if rewindNow { onRewindPressed?() }
         }
         mask |= Self.directionMask(pad.dpad)
         if settings.analogAsDpad {

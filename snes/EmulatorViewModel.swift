@@ -15,6 +15,31 @@ final class EmulatorViewModel: ObservableObject {
     @Published var fps: Double = 0
     /// Um painel modal do próprio app está na frente: o notch não pode devolver o foco agora.
     @Published var isPresentingDialog = false
+    /// Modo "voltar no tempo" aberto: jogo pausado, fita de miniaturas visível.
+    @Published private(set) var rewind: RewindSession?
+    /// Aviso de que o jogo continuou de um estado gravado; some sozinho.
+    @Published private(set) var resumeNotice: ResumeNotice?
+
+    struct RewindSession {
+        /// Snapshots do mais antigo ao mais novo; o último é o "agora".
+        var entries: [RewindHistory.Entry]
+        /// Snapshot exibido na tela.
+        var index: Int
+
+        var latest: Int { entries.count - 1 }
+        /// Quanto tempo atrás do "agora" está o snapshot exibido (≤ 0).
+        var offsetSeconds: Double { -RewindHistory.seconds(from: index, to: latest) }
+        /// Índice do snapshot mais próximo de `seconds` atrás do "agora", se existir.
+        func index(secondsAgo seconds: Double) -> Int? {
+            let steps = Int((seconds * 60.0988 / Double(RewindHistory.interval)).rounded())
+            let i = latest - steps
+            return i >= 0 ? i : nil
+        }
+    }
+
+    struct ResumeNotice: Equatable {
+        let savedAt: Date
+    }
 
     /// Frames do PPU. Fora do `@Published` de propósito: ver `ScreenView`.
     let frameSource = FrameSource()
@@ -34,6 +59,9 @@ final class EmulatorViewModel: ObservableObject {
 
     private let snes = SNES()
     private let sramStore = SRAMStore()
+    private let stateStore = StateStore()
+    private let history = RewindHistory()
+    private var noticeWork: DispatchWorkItem?
     private var displayLink: CADisplayLink?
     private var frameAccumulator: TimeInterval = 0
     private var lastTick: CFTimeInterval = 0
@@ -98,6 +126,9 @@ final class EmulatorViewModel: ObservableObject {
             isROMLoaded = true
             poweredOn = false
             userPaused = false
+            rewind = nil
+            history.clear()
+            restoreSavedState()
 
             RecentROMs.shared.remember(url: url, title: romTitle)
             applyRunState()
@@ -133,6 +164,10 @@ final class EmulatorViewModel: ObservableObject {
         saveSRAMIfNeeded()
         snes.reset()
         userPaused = false
+        rewind = nil
+        history.clear()
+        stateStore.remove(romHash: snes.cartridgeHash)
+        dismissResumeNotice()
         applyRunState()
     }
 
@@ -140,10 +175,11 @@ final class EmulatorViewModel: ObservableObject {
     func stopEmulation() {
         suspendEmulation()
         saveSRAMIfNeeded()
+        saveStateForResume()
     }
 
     private func applyRunState() {
-        let shouldRun = isROMLoaded && presentationWantsRun && !userPaused
+        let shouldRun = isROMLoaded && presentationWantsRun && !userPaused && rewind == nil
         if shouldRun {
             resumeEmulation()
         } else {
@@ -175,6 +211,7 @@ final class EmulatorViewModel: ObservableObject {
         isRunning = false
         snes.suspend(fadeDuration: NotchSettings.shared.fadeDuration)
         saveSRAMIfNeeded()
+        saveStateForResume()
     }
 
     // MARK: - Laço de frames
@@ -216,10 +253,121 @@ final class EmulatorViewModel: ObservableObject {
 
     private func runFrame() {
         snes.runFrame()
-        if let cgImage = snes.ppu.getFrameImage() {
+        let cgImage = snes.ppu.getFrameImage()
+        if let cgImage {
             frameSource.publish(cgImage)
         }
         frameCount += 1
+        history.frameDidRun { (snes.saveState(), cgImage) }
+    }
+
+    // MARK: - Voltar no tempo
+
+    /// Pausa e abre a fita com os últimos segundos. Sem histórico não há o que mostrar.
+    func enterRewind() {
+        guard isROMLoaded, poweredOn, rewind == nil else { return }
+        // O "agora" entra como último snapshot: cancelar volta exatamente para cá.
+        history.append(state: snes.saveState(), image: snes.ppu.getFrameImage())
+        rewind = RewindSession(entries: history.entries, index: history.count - 1)
+        applyRunState()
+    }
+
+    /// Anda `delta` snapshots (negativo = para trás) e mostra o frame daquele momento.
+    func rewindStep(_ delta: Int) {
+        guard var session = rewind else { return }
+        let target = max(0, min(session.latest, session.index + delta))
+        guard target != session.index else { return }
+        session.index = target
+        rewind = session
+        show(session.entries[target])
+    }
+
+    func rewindSelect(_ index: Int) {
+        guard let session = rewind else { return }
+        rewindStep(index - session.index)
+    }
+
+    /// Continua do snapshot exibido; o que veio depois dele é descartado.
+    func rewindConfirm() {
+        guard let session = rewind else { return }
+        if load(session.entries[session.index]) {
+            history.truncate(after: session.index)
+            saveStateForResume()
+        }
+        rewind = nil
+        applyRunState()
+    }
+
+    /// Fecha a fita e continua de onde o jogo estava.
+    func rewindCancel() {
+        guard let session = rewind else { return }
+        _ = load(session.entries[session.latest])
+        rewind = nil
+        applyRunState()
+    }
+
+    func toggleRewind() {
+        if rewind == nil { enterRewind() } else { rewindCancel() }
+    }
+
+    private func show(_ entry: RewindHistory.Entry) {
+        if let image = entry.image {
+            frameSource.publish(image)
+        } else if load(entry), let image = snes.ppu.getFrameImage() {
+            frameSource.publish(image)
+        }
+    }
+
+    private func load(_ entry: RewindHistory.Entry) -> Bool {
+        do {
+            try snes.loadState(entry.state.decompressed())
+            return true
+        } catch {
+            Log.saves.error("state do histórico inválido: \(String(describing: error), privacy: .public)")
+            return false
+        }
+    }
+
+    // MARK: - Retomar ao reabrir
+
+    /// Ao carregar a ROM, continua do último estado gravado, se houver.
+    private func restoreSavedState() {
+        dismissResumeNotice()
+        guard let saved = stateStore.load(romHash: snes.cartridgeHash) else { return }
+        do {
+            try snes.loadState(saved.state)
+        } catch {
+            Log.saves.warning("state salvo ignorado: \(String(describing: error), privacy: .public)")
+            stateStore.remove(romHash: snes.cartridgeHash)
+            snes.reset()
+            return
+        }
+        // O console já está no meio do jogo: retomar não pode ligar (resetar) de novo.
+        poweredOn = true
+        if let image = snes.ppu.getFrameImage() {
+            frameSource.publish(image)
+        }
+        resumeNotice = ResumeNotice(savedAt: saved.savedAt)
+        let work = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated { self?.resumeNotice = nil }
+        }
+        noticeWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8, execute: work)
+    }
+
+    func dismissResumeNotice() {
+        noticeWork?.cancel()
+        noticeWork = nil
+        if resumeNotice != nil { resumeNotice = nil }
+    }
+
+    private func saveStateForResume() {
+        guard isROMLoaded, poweredOn else { return }
+        do {
+            try stateStore.save(snes.saveState(), romHash: snes.cartridgeHash)
+        } catch {
+            Log.saves.error("falha ao gravar .nss: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     // MARK: - FPS

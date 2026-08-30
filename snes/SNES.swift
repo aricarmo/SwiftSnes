@@ -149,29 +149,34 @@ enum EmulatorError: Error, LocalizedError {
 }
 
 extension SNES {
-    struct SaveState: Codable {
-        let cpuState: CPU65816.State
-        let ppuState: PPU.State
-        let apuState: APU.State
-        let memoryState: MemoryBus.State
-        let totalCycles: UInt64
+    static let stateMagic: [UInt8] = Array("NSST".utf8)
+    static let stateVersion: UInt32 = 1
+
+    /// Snapshot completo do console (sem a ROM). Chamar entre frames.
+    func saveState() -> [UInt8] {
+        var w = StateWriter()
+        for b in Self.stateMagic { w.put(b) }
+        w.put(Self.stateVersion)
+        w.put(cartridgeHash)
+        w.put(totalCycles)
+        cpu.serialize(into: &w)
+        ppu.serialize(into: &w)
+        apu.serialize(into: &w)
+        memory.serialize(into: &w)
+        return w.bytes
     }
 
-    func createSaveState() -> SaveState {
-        return SaveState(
-            cpuState: cpu.getState(),
-            ppuState: ppu.getState(),
-            apuState: apu.getState(),
-            memoryState: memory.getState(),
-            totalCycles: totalCycles
-        )
-    }
-
-    func loadSaveState(_ state: SaveState) {
-        cpu.setState(state.cpuState)
-        ppu.setState(state.ppuState)
-        apu.setState(state.apuState)
-        memory.setState(state.memoryState)
-        totalCycles = state.totalCycles
+    /// Restaura um snapshot da mesma ROM. Em erro, o console fica num estado
+    /// parcial: o chamador deve resetar ou carregar outro state.
+    func loadState(_ bytes: [UInt8]) throws {
+        var r = StateReader(bytes)
+        for b in Self.stateMagic where try r.u8() != b { throw StateReader.Error.badMagic }
+        guard try r.u32() == Self.stateVersion else { throw StateReader.Error.badVersion }
+        guard try r.string() == cartridgeHash else { throw StateReader.Error.romMismatch }
+        totalCycles = try r.u64()
+        try cpu.deserialize(from: &r)
+        try ppu.deserialize(from: &r)
+        try apu.deserialize(from: &r)
+        try memory.deserialize(from: &r)
     }
 }

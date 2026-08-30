@@ -1703,43 +1703,21 @@ final class CPU65816 {
         2, 5, 5, 7, 5, 4, 6, 6, 2, 4, 4, 2, 8, 4, 7, 5,  // $F0
     ]
     
-    // MARK: - State Management
-    
-    struct State: Codable {
-        let a: UInt16
-        let x: UInt16
-        let y: UInt16
-        let s: UInt16
-        let d: UInt16
-        let db: UInt8
-        let pb: UInt8
-        let pc: UInt16
-        let p: UInt8
-        let isEmulationMode: Bool
-        let cycles: Int
+    // MARK: - Save state
+
+    func serialize(into w: inout StateWriter) {
+        w.put(a); w.put(x); w.put(y); w.put(s); w.put(d)
+        w.put(db); w.put(pb); w.put(pc); w.put(p)
+        w.put(isEmulationMode); w.put(cycles)
+        w.put(nmiPending); w.put(irqPending); w.put(waiting); w.put(stopped)
     }
-    
-    func getState() -> State {
-        return State(
-            a: a, x: x, y: y, s: s, d: d,
-            db: db, pb: pb, pc: pc, p: p,
-            isEmulationMode: isEmulationMode,
-            cycles: cycles
-        )
-    }
-    
-    func setState(_ state: State) {
-        a = state.a
-        x = state.x
-        y = state.y
-        s = state.s
-        d = state.d
-        db = state.db
-        pb = state.pb
-        pc = state.pc
-        p = state.p
-        isEmulationMode = state.isEmulationMode
-        cycles = state.cycles
+
+    func deserialize(from r: inout StateReader) throws {
+        a = try r.u16(); x = try r.u16(); y = try r.u16(); s = try r.u16(); d = try r.u16()
+        db = try r.u8(); pb = try r.u8(); pc = try r.u16(); p = try r.u8()
+        isEmulationMode = try r.bool(); cycles = try r.int()
+        nmiPending = try r.bool(); irqPending = try r.bool(); waiting = try r.bool(); stopped = try r.bool()
+        pageCrossed = false
     }
     
     // Flag Operations

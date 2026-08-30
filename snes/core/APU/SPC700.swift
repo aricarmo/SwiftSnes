@@ -1265,3 +1265,29 @@ final class SPC700 {
         return cycles
     }
 }
+
+// MARK: - Save state
+
+extension SPC700 {
+    func serialize(into w: inout StateWriter) {
+        w.put(a); w.put(x); w.put(y); w.put(sp); w.put(pc); w.put(psw)
+        w.put(ram); w.put(portsFromCPU); w.put(portsToCPU); w.put(dspAddr)
+        w.put(timerEnabled); w.put(timerDivisor); w.put(timerCounter); w.put(timerInternal)
+        w.put(timerStage1); w.put(timerLine); w.put(timerStage2)
+        w.put(timersDisable); w.put(timersEnable)
+        w.put(bootRomEnabled); w.put(cycles); w.put(stopped); w.put(sleeping)
+    }
+
+    func deserialize(from r: inout StateReader) throws {
+        a = try r.u8(); x = try r.u8(); y = try r.u8(); sp = try r.u8(); pc = try r.u16(); psw = try r.u8()
+        ram = try r.bytes8(count: ram.count)
+        portsFromCPU = try r.bytes8(count: 4); portsToCPU = try r.bytes8(count: 4); dspAddr = try r.u8()
+        timerEnabled = try r.bools(); timerDivisor = try r.bytes8(count: 3)
+        timerCounter = try r.bytes8(count: 3); timerInternal = try r.u16s()
+        timerStage1 = try r.bools(); timerLine = try r.bools(); timerStage2 = try r.ints()
+        timersDisable = try r.bool(); timersEnable = try r.bool()
+        bootRomEnabled = try r.bool(); cycles = try r.int(); stopped = try r.bool(); sleeping = try r.bool()
+        guard timerEnabled.count == 3, timerInternal.count == 3, timerStage1.count == 3,
+              timerLine.count == 3, timerStage2.count == 3 else { throw StateReader.Error.sizeMismatch }
+    }
+}

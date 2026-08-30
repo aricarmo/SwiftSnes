@@ -725,21 +725,46 @@ final class MemoryBus {
 
     // MARK: - Save state
 
-    struct State: Codable {
-        let wram: [UInt8]
-        let sram: [UInt8]
-        let nmitimen: UInt8
-        let wramAddress: UInt32
+    func serialize(into w: inout StateWriter) {
+        w.put(wram); w.put(cart.sram); w.put(openBus)
+        w.put(nmitimen); w.put(wrio); w.put(wrmpya); w.put(wrdiv); w.put(wrdivb)
+        w.put(htime); w.put(vtime); w.put(memsel); w.put(rdmpy); w.put(rddiv)
+        w.put(nmiFlag); w.put(irqFlag); w.put(inVBlank); w.put(inHBlank); w.put(autoJoypadBusy)
+        w.put(wramAddress)
+        w.put(joypadLatched); w.put(joypadStrobe); w.put(joypadShift)
+        for ch in dma {
+            w.put(ch.control); w.put(ch.bAddress); w.put(ch.aAddress); w.put(ch.aBank)
+            w.put(ch.size); w.put(ch.indirectBank); w.put(ch.tableAddress); w.put(ch.lineCounter); w.put(ch.unused)
+            w.put(ch.hdmaActive); w.put(ch.hdmaDoTransfer); w.put(ch.hdmaTerminated)
+        }
+        w.put(mdmaen); w.put(hdmaen); w.put(dmaCycles)
+        w.put(cartDSP != nil)
+        cartDSP?.serialize(into: &w)
     }
 
-    func getState() -> State {
-        return State(wram: wram, sram: cart.sram, nmitimen: nmitimen, wramAddress: wramAddress)
-    }
-
-    func setState(_ state: State) {
-        wram = state.wram
-        cart.setSRAM(state.sram)
-        nmitimen = state.nmitimen
-        wramAddress = state.wramAddress
+    func deserialize(from r: inout StateReader) throws {
+        wram = try r.bytes8(count: wram.count)
+        let sram = try r.bytes8()
+        guard sram.count == cart.sram.count else { throw StateReader.Error.sizeMismatch }
+        cart.setSRAM(sram)
+        cart.markSRAMDirty()
+        openBus = try r.u8()
+        nmitimen = try r.u8(); wrio = try r.u8(); wrmpya = try r.u8(); wrdiv = try r.u16(); wrdivb = try r.u8()
+        htime = try r.u16(); vtime = try r.u16(); memsel = try r.u8(); rdmpy = try r.u16(); rddiv = try r.u16()
+        nmiFlag = try r.bool(); irqFlag = try r.bool(); inVBlank = try r.bool(); inHBlank = try r.bool(); autoJoypadBusy = try r.bool()
+        wramAddress = try r.u32()
+        joypadLatched = try r.u16s(); joypadStrobe = try r.bool(); joypadShift = try r.ints()
+        guard joypadLatched.count == 4, joypadShift.count == 4 else { throw StateReader.Error.sizeMismatch }
+        for i in 0..<8 {
+            var ch = DMAChannel()
+            ch.control = try r.u8(); ch.bAddress = try r.u8(); ch.aAddress = try r.u16(); ch.aBank = try r.u8()
+            ch.size = try r.u16(); ch.indirectBank = try r.u8(); ch.tableAddress = try r.u16(); ch.lineCounter = try r.u8(); ch.unused = try r.u8()
+            ch.hdmaActive = try r.bool(); ch.hdmaDoTransfer = try r.bool(); ch.hdmaTerminated = try r.bool()
+            dma[i] = ch
+        }
+        mdmaen = try r.u8(); hdmaen = try r.u8(); dmaCycles = try r.int()
+        let hasDSP = try r.bool()
+        guard hasDSP == (cartDSP != nil) else { throw StateReader.Error.sizeMismatch }
+        try cartDSP?.deserialize(from: &r)
     }
 }

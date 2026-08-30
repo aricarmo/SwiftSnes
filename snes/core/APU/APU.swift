@@ -104,81 +104,19 @@ final class APU {
         }
     }
 
-    struct State: Codable {
-        let ram: [UInt8]
-        let portsFromCPU: [UInt8]
-        let portsToCPU: [UInt8]
-        let a: UInt8
-        let x: UInt8
-        let y: UInt8
-        let sp: UInt8
-        let pc: UInt16
-        let psw: UInt8
-        let dspAddr: UInt8
-        let bootRomEnabled: Bool
-        let stopped: Bool
-        let sleeping: Bool
-        let dspRegisters: [UInt8]
-        let spcCycleDebt: Double
-        let dspCycleAccumulator: Double
-        let timerEnabled: [Bool]
-        let timerDivisor: [UInt8]
-        let timerCounter: [UInt8]
-        let timerInternal: [UInt16]
+    // MARK: - Save state
+
+    func serialize(into w: inout StateWriter) {
+        spc700.serialize(into: &w)
+        dsp.serialize(into: &w)
+        w.put(spcCycleDebt); w.put(dspCycleAccumulator)
     }
 
-    func getState() -> State {
-        State(
-            ram: spc700.ram,
-            portsFromCPU: spc700.portsFromCPU,
-            portsToCPU: spc700.portsToCPU,
-            a: spc700.a,
-            x: spc700.x,
-            y: spc700.y,
-            sp: spc700.sp,
-            pc: spc700.pc,
-            psw: spc700.psw,
-            dspAddr: spc700.dspAddr,
-            bootRomEnabled: spc700.bootRomEnabled,
-            stopped: spc700.stopped,
-            sleeping: spc700.sleeping,
-            dspRegisters: dsp.regs,
-            spcCycleDebt: spcCycleDebt,
-            dspCycleAccumulator: dspCycleAccumulator,
-            timerEnabled: spc700.timerEnabled,
-            timerDivisor: spc700.timerDivisor,
-            timerCounter: spc700.timerCounter,
-            timerInternal: spc700.timerInternal
-        )
-    }
-
-    func setState(_ state: State) {
-        reset()
-        if state.ram.count == spc700.ram.count {
-            spc700.ram = state.ram
-        }
-        spc700.portsFromCPU = state.portsFromCPU
-        spc700.portsToCPU = state.portsToCPU
-        spc700.a = state.a
-        spc700.x = state.x
-        spc700.y = state.y
-        spc700.sp = state.sp
-        spc700.pc = state.pc
-        spc700.psw = state.psw
-        spc700.dspAddr = state.dspAddr
-        spc700.bootRomEnabled = state.bootRomEnabled
-        spc700.stopped = state.stopped
-        spc700.sleeping = state.sleeping
-        if state.dspRegisters.count == dsp.regs.count {
-            dsp.regs = state.dspRegisters
-        }
-        spcCycleDebt = state.spcCycleDebt
-        dspCycleAccumulator = state.dspCycleAccumulator
-        if state.timerEnabled.count == 3 {
-            spc700.timerEnabled = state.timerEnabled
-            spc700.timerDivisor = state.timerDivisor
-            spc700.timerCounter = state.timerCounter
-            spc700.timerInternal = state.timerInternal
-        }
+    func deserialize(from r: inout StateReader) throws {
+        try spc700.deserialize(from: &r)
+        try dsp.deserialize(from: &r)
+        spcCycleDebt = try r.double(); dspCycleAccumulator = try r.double()
+        pendingAudioLeft.removeAll(keepingCapacity: true)
+        pendingAudioRight.removeAll(keepingCapacity: true)
     }
 }

@@ -247,4 +247,6 @@ final class Cartridge {
     }
 
     func markSRAMClean() { sramDirty = false }
+    /// Um state carregado pode ter trazido uma SRAM diferente da gravada em disco.
+    func markSRAMDirty() { if !sram.isEmpty { sramDirty = true } }
 }

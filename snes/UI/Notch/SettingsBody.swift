@@ -192,7 +192,7 @@ private struct GamepadStatusRow: View {
                 Spacer()
                 if let level = gamepad.batteryLevel, level >= 0 {
                     Text("\(Int((level * 100).rounded()))%")
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(.system(size: 10))
                         .foregroundStyle(NotchPalette.primaryText.opacity(0.38))
                 }
                 Circle()
@@ -200,7 +200,7 @@ private struct GamepadStatusRow: View {
                     .frame(width: 6, height: 6)
                     .shadow(color: NotchPalette.running.opacity(0.7), radius: 3)
                 Text("conectado")
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(size: 10))
                     .foregroundStyle(NotchPalette.primaryText.opacity(0.9))
             } else {
                 Text("Nenhum controle")
@@ -286,7 +286,7 @@ private struct KeyCap: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 10, design: .monospaced))
+            .font(.system(size: 10))
             .lineLimit(1)
             .foregroundStyle(highlighted ? NotchPalette.accentBright : NotchPalette.primaryText.opacity(0.9))
             .padding(.horizontal, 7)
@@ -326,7 +326,7 @@ private struct ScreenSizeCard: View {
                     .font(.system(size: 11))
                     .foregroundStyle(isSelected ? NotchPalette.accentBright : NotchPalette.primaryText.opacity(0.72))
                 Text("\(Int(videoSize.width))×\(Int(videoSize.height))")
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(.system(size: 9))
                     .foregroundStyle(NotchPalette.primaryText.opacity(0.38))
             }
             .frame(maxWidth: .infinity)
@@ -377,7 +377,7 @@ private struct UpdateStatusRow: View {
                         .font(.system(size: 12))
                         .foregroundStyle(NotchPalette.primaryText.opacity(0.85))
                     Text("v\(updater.currentVersion)")
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(.system(size: 10))
                         .foregroundStyle(NotchPalette.primaryText.opacity(0.38))
                 }
                 Text(detail.text)

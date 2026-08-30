@@ -73,7 +73,7 @@ private struct NotchHeaderLeading: View {
                     .frame(width: 13, height: 13)
                     .foregroundStyle(vm.isROMLoaded ? NotchPalette.accentSoft : Color.white.opacity(0.4))
                 Text(vm.isROMLoaded ? vm.shortTitle : "SNES")
-                    .font(.system(size: 10.5, design: .monospaced))
+                    .font(.system(size: 10.5))
                     .kerning(0.6)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -118,7 +118,8 @@ private struct NotchHeaderTrailing: View {
                     .frame(width: 6, height: 6)
                     .shadow(color: NotchPalette.running.opacity(0.7), radius: 4)
                 Text("\(Int(vm.fps.rounded())) FPS")
-                    .font(.system(size: 10.5, design: .monospaced))
+                    .font(.system(size: 10.5))
+                    .monospacedDigit()
                     .foregroundStyle(NotchPalette.primaryText.opacity(0.9))
             }
         } else {
@@ -126,7 +127,7 @@ private struct NotchHeaderTrailing: View {
                 Image(systemName: "pause.fill")
                     .font(.system(size: 9))
                 Text("PAUSADO")
-                    .font(.system(size: 10.5, design: .monospaced))
+                    .font(.system(size: 10.5))
             }
             .foregroundStyle(NotchPalette.primaryText.opacity(0.55))
         }
@@ -147,7 +148,7 @@ struct GamepadBadge: View {
                 .font(.system(size: 10))
                 .foregroundStyle(NotchPalette.accentSoft)
             Text(text)
-                .font(.system(size: 10.5, design: .monospaced))
+                .font(.system(size: 10.5))
                 .foregroundStyle(NotchPalette.primaryText.opacity(0.86))
         }
     }

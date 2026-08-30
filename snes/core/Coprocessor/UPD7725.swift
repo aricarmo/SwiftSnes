@@ -544,3 +544,42 @@ final class UPD7725 {
         registers.dr = byte << 8 | registers.dr & 0x00FF
     }
 }
+
+// MARK: - Save state
+
+extension UPD7725 {
+    func serialize(into w: inout StateWriter) {
+        let g = registers
+        w.put(g.stack); w.put(g.pc); w.put(g.rp); w.put(g.dp); w.put(g.sp)
+        w.put(g.k); w.put(g.l); w.put(g.m); w.put(g.n); w.put(g.a); w.put(g.b)
+        w.put(g.si); w.put(g.so); w.put(g.tr); w.put(g.trb); w.put(g.dr)
+        w.put(g.sr.word); w.put(g.sr.drs); w.put(g.sr.siack); w.put(g.sr.soack)
+        w.put(scratch)
+        for f in [flagsA, flagsB] { w.put(f.ov0); w.put(f.ov1); w.put(f.z); w.put(f.c); w.put(f.s0); w.put(f.s1) }
+        w.put(cycles); w.put(steps)
+    }
+
+    func deserialize(from r: inout StateReader) throws {
+        let g = registers
+        let stack = try r.ints()
+        guard stack.count == g.stack.count else { throw StateReader.Error.sizeMismatch }
+        g.stack = stack
+        g.pc = try r.int(); g.rp = try r.int(); g.dp = try r.int(); g.sp = try r.int()
+        g.k = try r.int(); g.l = try r.int(); g.m = try r.int(); g.n = try r.int(); g.a = try r.int(); g.b = try r.int()
+        g.si = try r.int(); g.so = try r.int(); g.tr = try r.int(); g.trb = try r.int(); g.dr = try r.int()
+        var sr = Status()
+        sr.assign(try r.int())
+        sr.drs = try r.bool(); sr.siack = try r.bool(); sr.soack = try r.bool()
+        g.sr = sr
+        let data = try r.u16s()
+        guard data.count == scratch.count else { throw StateReader.Error.sizeMismatch }
+        scratch = data
+        var flags = [Flags(), Flags()]
+        for i in 0..<2 {
+            flags[i].ov0 = try r.bool(); flags[i].ov1 = try r.bool(); flags[i].z = try r.bool()
+            flags[i].c = try r.bool(); flags[i].s0 = try r.bool(); flags[i].s1 = try r.bool()
+        }
+        flagsA = flags[0]; flagsB = flags[1]
+        cycles = try r.int(); steps = try r.int()
+    }
+}

@@ -1297,84 +1297,78 @@ final class PPU {
         )
     }
     
-    struct State: Codable {
-        let registers: [UInt8]
-        let vram: [UInt8]
-        let cgram: [UInt8]
-        let oam: [UInt8]
-        let vramAddress: UInt16
-        let oamAddress: UInt16
-        let cgramAddress: UInt8
-        let screenMode: Int
-        let brightness: UInt8
-        let scanline: Int
-        let cycle: Int
-        let frameCount: Int
-        let inVBlank: Bool
-        let inHBlank: Bool
-        let frameOddEven: Bool
-        let bgHScroll: [Int]
-        let bgVScroll: [Int]
-        let bgEnabled: [Bool]
-        let objEnabled: Bool
-        let mainScreenLayers: UInt8
-        let subScreenLayers: UInt8
-    }
-    
-    func getState() -> State {
-        return State(
-            registers: registers,
-            vram: vram,
-            cgram: cgram,
-            oam: oam,
-            vramAddress: vramAddress,
-            oamAddress: oamAddress,
-            cgramAddress: cgramAddress,
-            screenMode: screenMode,
-            brightness: brightness,
-            scanline: scanline,
-            cycle: cycle,
-            frameCount: frameCount,
-            inVBlank: inVBlank,
-            inHBlank: inHBlank,
-            frameOddEven: frameOddEven,
-            bgHScroll: bgConfig.map { $0.hScroll },
-            bgVScroll: bgConfig.map { $0.vScroll },
-            bgEnabled: bgEnabled,
-            objEnabled: objEnabled,
-            mainScreenLayers: mainScreenLayers,
-            subScreenLayers: subScreenLayers
-        )
-    }
-    
-    func setState(_ state: State) {
-        registers = state.registers
-        vram = state.vram
-        cgram = state.cgram
-        oam = state.oam
-        vramAddress = state.vramAddress
-        oamAddress = state.oamAddress
-        cgramAddress = state.cgramAddress
-        screenMode = state.screenMode
-        brightness = state.brightness
-        scanline = state.scanline
-        cycle = state.cycle
-        frameCount = state.frameCount
-        inVBlank = state.inVBlank
-        inHBlank = state.inHBlank
-        frameOddEven = state.frameOddEven
-        
-        for i in 0..<4 {
-            bgConfig[i].hScroll = state.bgHScroll[i]
-            bgConfig[i].vScroll = state.bgVScroll[i]
+    // MARK: - Save state
+
+    func serialize(into w: inout StateWriter) {
+        w.put(registers); w.put(vram); w.put(cgram); w.put(oam); w.put(frameBuffer)
+        w.put(scanline); w.put(cycle); w.put(frameCount)
+        w.put(screenMode); w.put(brightness)
+        w.put(vramAddress); w.put(vramIncrement); w.put(vramRemapMode); w.put(vramReadBuffer)
+        w.put(objSize); w.put(objNameBase); w.put(objNameSelect)
+        w.put(oamAddress); w.put(oamAddrLow); w.put(oamAddrHigh); w.put(oamHighTable)
+        w.put(oamFirstWrite); w.put(oamWriteBuffer); w.put(oamReadBuffer)
+        for bg in bgConfig {
+            w.put(bg.tilemapBase); w.put(bg.tilemapSize); w.put(bg.tileDataBase)
+            w.put(bg.tileSize); w.put(bg.hScroll); w.put(bg.vScroll)
         }
-        
-        bgEnabled = state.bgEnabled
-        objEnabled = state.objEnabled
-        mainScreenLayers = state.mainScreenLayers
-        subScreenLayers = state.subScreenLayers
+        w.put(bgEnabled); w.put(objEnabled)
+        w.put(mosaicSize); w.put(mosaicEnabled)
+        w.put(window1Left); w.put(window1Right); w.put(window2Left); w.put(window2Right)
+        w.put(windowMaskBG); w.put(windowMaskOBJ); w.put(windowMaskMath)
+        w.put(colorMathEnabled); w.put(colorMathMode); w.put(fixedColor)
+        w.put(mainScreenLayers); w.put(subScreenLayers)
+        w.put(mode7Matrix); w.put(mode7CenterX); w.put(mode7CenterY)
+        w.put(mode7FlipX); w.put(mode7FlipY); w.put(mode7Repeat); w.put(mode7OutsideFill)
+        w.put(bg3Priority); w.put(multiplyResult)
+        w.put(cgramAddress); w.put(cgramLatchBit); w.put(cgramLatch)
+        w.put(m7PrevWrite); w.put(mode7HOfs); w.put(mode7VOfs)
+        w.put(bgPrevWrite); w.put(bgScrollLatch); w.put(bgScrollLatchBit)
+        w.put(hCounter); w.put(vCounter); w.put(latchedH); w.put(latchedV)
+        w.put(hCounterLatched); w.put(vCounterLatched)
+        w.put(ppu1OpenBus); w.put(ppu2OpenBus)
+        w.put(inVBlank); w.put(inHBlank); w.put(nmiFlag); w.put(irqFlag); w.put(frameOddEven)
+        w.put(autoJoypadCounter)
     }
-    
+
+    func deserialize(from r: inout StateReader) throws {
+        registers = try r.bytes8(count: registers.count)
+        vram = try r.bytes8(count: vram.count)
+        cgram = try r.bytes8(count: cgram.count)
+        oam = try r.bytes8(count: oam.count)
+        frameBuffer = try r.bytes8(count: frameBuffer.count)
+        scanline = try r.int(); cycle = try r.int(); frameCount = try r.int()
+        screenMode = try r.int(); brightness = try r.u8()
+        vramAddress = try r.u16(); vramIncrement = try r.u16(); vramRemapMode = try r.u8(); vramReadBuffer = try r.u16()
+        objSize = try r.int(); objNameBase = try r.u16(); objNameSelect = try r.u16()
+        oamAddress = try r.u16(); oamAddrLow = try r.u8(); oamAddrHigh = try r.u8(); oamHighTable = try r.bool()
+        oamFirstWrite = try r.bool(); oamWriteBuffer = try r.u8(); oamReadBuffer = try r.u8()
+        for i in 0..<4 {
+            bgConfig[i].tilemapBase = try r.u16(); bgConfig[i].tilemapSize = try r.int()
+            bgConfig[i].tileDataBase = try r.u16(); bgConfig[i].tileSize = try r.bool()
+            bgConfig[i].hScroll = try r.int(); bgConfig[i].vScroll = try r.int()
+        }
+        bgEnabled = try r.bools(); objEnabled = try r.bool()
+        mosaicSize = try r.int(); mosaicEnabled = try r.bools()
+        window1Left = try r.u8(); window1Right = try r.u8(); window2Left = try r.u8(); window2Right = try r.u8()
+        windowMaskBG = try r.bytes8(count: 4); windowMaskOBJ = try r.u8(); windowMaskMath = try r.u8()
+        colorMathEnabled = try r.bool(); colorMathMode = try r.u8(); fixedColor = try r.u16()
+        mainScreenLayers = try r.u8(); subScreenLayers = try r.u8()
+        mode7Matrix = try r.i16s(); mode7CenterX = try r.i16(); mode7CenterY = try r.i16()
+        mode7FlipX = try r.bool(); mode7FlipY = try r.bool(); mode7Repeat = try r.bool(); mode7OutsideFill = try r.bool()
+        bg3Priority = try r.bool(); multiplyResult = try r.u32()
+        cgramAddress = try r.u8(); cgramLatchBit = try r.bool(); cgramLatch = try r.u8()
+        m7PrevWrite = try r.u8(); mode7HOfs = try r.int(); mode7VOfs = try r.int()
+        bgPrevWrite = try r.u8(); bgScrollLatch = try r.u8(); bgScrollLatchBit = try r.bool()
+        hCounter = try r.u16(); vCounter = try r.u16(); latchedH = try r.bool(); latchedV = try r.bool()
+        hCounterLatched = try r.u16(); vCounterLatched = try r.u16()
+        ppu1OpenBus = try r.u8(); ppu2OpenBus = try r.u8()
+        inVBlank = try r.bool(); inHBlank = try r.bool(); nmiFlag = try r.bool(); irqFlag = try r.bool(); frameOddEven = try r.bool()
+        autoJoypadCounter = try r.int()
+        guard bgEnabled.count == 4, mosaicEnabled.count == 5, mode7Matrix.count == 4 else {
+            throw StateReader.Error.sizeMismatch
+        }
+    }
+
     func isInVBlank() -> Bool { return inVBlank }
     func isInHBlank() -> Bool { return inHBlank }
     func getCurrentScanline() -> Int { return scanline }

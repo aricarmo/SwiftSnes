@@ -88,7 +88,7 @@ private struct DropZone: View {
                         .font(.system(size: 12.5))
                         .foregroundStyle(NotchPalette.primaryText.opacity(0.78))
                     Text(".SFC  .SMC  .FIG")
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(.system(size: 10))
                         .kerning(0.6)
                         .foregroundStyle(NotchPalette.primaryText.opacity(0.38))
                 }
@@ -116,7 +116,7 @@ private struct RecentROMsList: View {
                             .foregroundStyle(NotchPalette.primaryText.opacity(0.85))
                         Spacer()
                         Text(entry.relativeDescription)
-                            .font(.system(size: 9.5, design: .monospaced))
+                            .font(.system(size: 9.5))
                             .foregroundStyle(NotchPalette.primaryText.opacity(0.35))
                     }
                     .padding(.horizontal, 9)
@@ -140,7 +140,7 @@ struct SectionLabel: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 9.5, design: .monospaced))
+            .font(.system(size: 9.5))
             .kerning(1)
             .foregroundStyle(NotchPalette.primaryText.opacity(0.33))
     }

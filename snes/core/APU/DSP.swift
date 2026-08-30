@@ -21,24 +21,6 @@ private func CLAMP16(_ v: inout Int) {
 }
 
 final class DSP: DSPInterface {
-    struct VoiceSnapshot {
-        var hiddenEnv = 0
-        var konDelay = 0
-        var output = 0
-    }
-
-    struct Snapshot {
-        var globalCounter = 0
-        var noiseLevel: Int16 = 0x4000
-        var echoPos = 0
-        var echoHistL = [Int16](repeating: 0, count: 8)
-        var echoHistR = [Int16](repeating: 0, count: 8)
-        var echoHistPos = 0
-        var konLatch: UInt8 = 0
-        var koffLatch: UInt8 = 0
-        var voices = [VoiceSnapshot](repeating: VoiceSnapshot(), count: 8)
-    }
-
     // MARK: Registers
 
     /// All 128 DSP registers (address space $00-$7F).
@@ -186,41 +168,40 @@ final class DSP: DSPInterface {
     private var konLatch: UInt8 = 0
     private var koffLatch: UInt8 = 0
 
-    func captureSnapshot() -> Snapshot {
-        Snapshot(
-            globalCounter: globalCounter,
-            noiseLevel: noiseLevel,
-            echoPos: echoPos,
-            echoHistL: echoHistL,
-            echoHistR: echoHistR,
-            echoHistPos: echoHistPos,
-            konLatch: konLatch,
-            koffLatch: koffLatch,
-            voices: voices.map { voice in
-                VoiceSnapshot(
-                    hiddenEnv: voice.hiddenEnv,
-                    konDelay: voice.konDelay,
-                    output: voice.output
-                )
-            }
-        )
+    // MARK: Save state
+
+    private static let envModes: [EnvMode] = [.attack, .decay, .sustain, .release]
+
+    func serialize(into w: inout StateWriter) {
+        w.put(regs)
+        for v in voices {
+            w.put(v.brrAddr); w.put(v.brrOffset); w.put(v.brrBuffer); w.put(v.brrHeader)
+            w.put(v.pitchCounter); w.put(v.envLevel); w.put(v.hiddenEnv)
+            w.put(UInt8(Self.envModes.firstIndex(of: v.envMode) ?? 3))
+            w.put(v.keyedOn); w.put(v.ended); w.put(v.konDelay); w.put(v.prev); w.put(v.output)
+        }
+        w.put(sampleCounter); w.put(globalCounter); w.put(noiseLevel)
+        w.put(echoPos); w.put(echoHistL); w.put(echoHistR); w.put(echoHistPos)
+        w.put(konLatch); w.put(koffLatch)
     }
 
-    func restoreSnapshot(_ snapshot: Snapshot) {
-        globalCounter = snapshot.globalCounter
-        noiseLevel = snapshot.noiseLevel
-        echoPos = snapshot.echoPos
-        echoHistL = snapshot.echoHistL
-        echoHistR = snapshot.echoHistR
-        echoHistPos = snapshot.echoHistPos
-        konLatch = snapshot.konLatch
-        koffLatch = snapshot.koffLatch
-
-        for index in 0..<min(voices.count, snapshot.voices.count) {
-            voices[index].hiddenEnv = snapshot.voices[index].hiddenEnv
-            voices[index].konDelay = snapshot.voices[index].konDelay
-            voices[index].output = snapshot.voices[index].output
+    func deserialize(from r: inout StateReader) throws {
+        regs = try r.bytes8(count: 128)
+        for i in 0..<8 {
+            var v = Voice()
+            v.brrAddr = try r.u16(); v.brrOffset = try r.int(); v.brrBuffer = try r.i16s(); v.brrHeader = try r.u8()
+            v.pitchCounter = try r.u16(); v.envLevel = try r.int(); v.hiddenEnv = try r.int()
+            v.envMode = Self.envModes[Int(try r.u8()) & 3]
+            v.keyedOn = try r.bool(); v.ended = try r.bool(); v.konDelay = try r.int(); v.prev = try r.i16s(); v.output = try r.int()
+            guard v.brrBuffer.count == 16, v.prev.count == 4 else { throw StateReader.Error.sizeMismatch }
+            voices[i] = v
         }
+        sampleCounter = try r.u32(); globalCounter = try r.int(); noiseLevel = try r.i16()
+        echoPos = try r.int(); echoHistL = try r.i16s(); echoHistR = try r.i16s(); echoHistPos = try r.int()
+        konLatch = try r.u8(); koffLatch = try r.u8()
+        guard echoHistL.count == 8, echoHistR.count == 8 else { throw StateReader.Error.sizeMismatch }
+        sampleBufferL.removeAll(keepingCapacity: true)
+        sampleBufferR.removeAll(keepingCapacity: true)
     }
 
     func reset() {

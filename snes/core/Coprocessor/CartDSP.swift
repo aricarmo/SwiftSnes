@@ -224,6 +224,16 @@ final class CartDSPChip {
         if steps > 0 { core.run(steps: steps) }
     }
 
+    func serialize(into w: inout StateWriter) {
+        w.put(rest)
+        core.serialize(into: &w)
+    }
+
+    func deserialize(from r: inout StateReader) throws {
+        rest = try r.int()
+        try core.deserialize(from: &r)
+    }
+
     func read(isStatus: Bool) -> UInt8 {
         if isStatus { return core.readStatus() }
         return core.readData()
