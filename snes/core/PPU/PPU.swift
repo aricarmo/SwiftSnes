@@ -313,10 +313,15 @@ final class PPU {
     
     func writeRegister(_ address: UInt16, _ value: UInt8) {
         let reg = address & 0x3F
+        let previous = registers[Int(reg)]
         registers[Int(reg)] = value
         
         switch reg {
         case 0x00:  // INIDISP - Display control
+            // Sair do forced blank durante o vblank também recarrega a OAM
+            if (previous & 0x80) != 0 && (value & 0x80) == 0 && inVBlank {
+                reloadOAMAddress()
+            }
             brightness = value & 0x0F
             ppu1OpenBus = value
 
@@ -570,6 +575,13 @@ final class PPU {
         }
     }
     
+    /// Recarrega o endereço interno da OAM a partir de OAMADDL/OAMADDH.
+    private func reloadOAMAddress() {
+        oamAddress = ((UInt16(oamAddrHigh & 0x01) << 8) | UInt16(oamAddrLow)) << 1
+        oamHighTable = (oamAddrHigh & 0x01) != 0
+        oamFirstWrite = true
+    }
+
     /// O remapeamento não altera o endereço armazenado: ele só rotaciona os bits
     /// baixos no momento do acesso (usado para uploads de tiles).
     @inline(__always)
@@ -705,6 +717,13 @@ final class PPU {
             if scanline == 225 {
                 inVBlank = true
                 nmiFlag = true
+                // No início do vblank (fora do forced blank) o hardware recarrega
+                // o endereço interno da OAM a partir de $2102/$2103. Jogos como
+                // DKC fazem DMA para $2104 todo frame sem reescrever OAMADD e
+                // dependem disso; sem a recarga a OAM fica deslocada.
+                if (registers[0x00] & 0x80) == 0 {
+                    reloadOAMAddress()
+                }
                 // Dispara NMI e auto-joypad read
                 bus.setVBlank(true)
             }
@@ -1079,8 +1098,11 @@ final class PPU {
                 if drawX >= 256 || drawX + 8 <= 0 { continue }
 
                 let mirrorCol = hFlip ? (tilesWide - 1 - tileCol) : tileCol
-                // O índice dá a volta dentro da tabela de 256 tiles
-                let actualTile = (tile + tileRow * 16 + mirrorCol) & 0xFF
+                // O hardware faz wrap separado: a coluna dá a volta dentro da
+                // linha de 16 tiles (nibble baixo) e a linha dentro das 16 linhas
+                // (nibble alto). Sem isso, sprites cujo tile base fica no fim da
+                // linha puxam tiles da linha seguinte e aparecem com lixo.
+                let actualTile = ((tile + tileRow * 16) & 0xF0) | ((tile + mirrorCol) & 0x0F)
                 let rowAddr = chrBase + actualTile * 32 + (fineY & 7) * 2
 
                 for px in 0..<8 {
