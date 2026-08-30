@@ -1,126 +1,153 @@
 // SNES.swift
 import Foundation
 
-class SNES {
-    // Componentes principais
+final class SNES {
     var cpu: CPU65816
     public var ppu: PPU
     var apu: APU
     var memory: MemoryBus
-    
-    // Estado do sistema
+
     var isRunning: Bool = false
     var totalCycles: UInt64 = 0
-    
-    // Clock do SNES (NTSC)
+
     let masterClockFrequency = 21_477_272  // ~21.477 MHz
-    let cpuDivider = 12  // CPU roda a master_clock / 12
-    
+
+    /// Um ciclo de CPU equivale a ~2 dots do PPU (8 vs 4 master cycles)
+    private let dotsPerCPUCycle = 2
+
+    /// Trava de segurança: se o CPU travar num loop sem avançar o PPU
+    private let maxStepsPerFrame = 400_000
+    private var reportedTruncatedFrame = false
+
     init() {
-        // Inicializa barramento de memória
         self.memory = MemoryBus()
-        
-        // Inicializa componentes
+
         self.cpu = CPU65816(memory: memory)
         self.ppu = PPU(memory: memory)
-        self.apu = APU(memory: memory)
-        
-        // Conecta componentes ao barramento
+        self.apu = APU()
+
         memory.connectCPU(cpu)
         memory.connectPPU(ppu)
         memory.connectAPU(apu)
+
+        ppu.connectCPU(cpu)
     }
-    
-    // Carrega ROM do cartucho
-    func loadROM(data: Data) throws {
-        var romData = data
-        
-        // Detecta e remove header SMC se presente
-        let hasHeader = (data.count % 0x8000) == 512
-        if hasHeader {
-            print("Header SMC detectado - removendo 512 bytes")
-            romData = data.subdata(in: 512..<data.count)
-        }
-        
-        // Verifica se a ROM tem pelo menos o tamanho mínimo
-        guard romData.count >= 0x8000 else {
-            throw EmulatorError.invalidROM
-        }
-        
-        // Carrega a ROM na memória
-        memory.loadROM(data: romData)
-        
-        // Reset do sistema após carregar a ROM
+
+    deinit {
+        apu.stopAudio()
+        memory.disconnect()
+    }
+
+    func loadROM(data: Data, firmwareDirectory: URL? = nil) throws {
+        try memory.loadROM(data: data, firmwareDirectory: firmwareDirectory)
         reset()
     }
-    
-    // Executa um frame completo
-    func runFrame() {
-        guard isRunning else {
-            print("runFrame chamado mas isRunning = false")
-            return
-        }
-        
-        
-        // NTSC: 262 scanlines por frame
-        for scanline in 0..<262 {
-            // Cada scanline tem 1364 master cycles
-            for _ in 0..<1364 {
-                // CPU roda a cada 12 master cycles
-                if totalCycles % UInt64(cpuDivider) == 0 {
-                    cpu.step()
-                }
-                
-                // PPU roda a cada 4 master cycles
-                if totalCycles % 4 == 0 {
-                    ppu.step()
-                }
-                
-                // APU tem seu próprio timing
-                apu.step()
-                
-                totalCycles += 1
-            }
-            
-            // Fim da scanline
-            ppu.endScanline(scanline)
-        }
-        
-        // Fim do frame
-        ppu.endFrame()
+
+    var cartridgeTitle: String { memory.cart.title }
+    var cartridgeMapper: String { memory.cart.mapper.description }
+    var cartridgeHash: String { memory.cart.romHash }
+
+    // MARK: - SRAM
+
+    var sramNeedsSave: Bool { memory.cart.sramDirty }
+    var sram: [UInt8] { memory.cart.sram }
+
+    func restoreSRAM(_ data: [UInt8]) { memory.cart.setSRAM(data) }
+    func markSRAMSaved() { memory.cart.markSRAMClean() }
+
+    // MARK: - Controles
+
+    /// Atualiza o estado de um controle. Formato: B Y Sel Sta Up Dn Lf Rt A X L R 0 0 0 0
+    func setJoypad(_ index: Int, state: UInt16) {
+        guard index >= 0 && index < 4 else { return }
+        memory.joypadState[index] = state
     }
-    
-    // Reset do sistema
+
+    // MARK: - Execução
+
+    /// Executa até o PPU completar um frame.
+    func runFrame() {
+        guard isRunning else { return }
+
+        memory.resetDMACycles()
+
+        var frameDone = false
+        var steps = 0
+
+        while !frameDone && steps < maxStepsPerFrame {
+            let cpuCycles = cpu.step()
+
+            let stolen = memory.dmaCycles
+            memory.resetDMACycles()
+
+            let totalCycles = cpuCycles + stolen
+
+            if ppu.step(dots: totalCycles * dotsPerCPUCycle) {
+                frameDone = true
+            }
+
+            apu.step(cycles: totalCycles)
+            memory.advanceCartDSP(cpuCycles: totalCycles)
+
+            self.totalCycles &+= UInt64(totalCycles)
+            steps += 1
+        }
+
+        if steps >= maxStepsPerFrame && !reportedTruncatedFrame {
+            reportedTruncatedFrame = true
+            Log.emulator.error("frame truncado em \(steps) instruções sem o PPU terminar; CPU em $\(String(format: "%02X:%04X", self.cpu.pb, self.cpu.pc), privacy: .public)")
+        }
+
+        apu.flushAudio()
+    }
+
     func reset() {
-        cpu.reset()
+        memory.reset()
         ppu.reset()
         apu.reset()
-        memory.reset()
+        cpu.reset()   // por último: precisa ler o vetor de reset já com tudo no lugar
         totalCycles = 0
+        reportedTruncatedFrame = false
     }
-    
-    // Liga/desliga o sistema
+
     func powerOn() {
         reset()
         isRunning = true
-        
-        // Debug: mostra onde o CPU vai começar
-        print("Sistema ligado. PC inicial: \(String(format: "$%04X", cpu.pc))")
+        apu.startAudio()
     }
-    
+
     func powerOff() {
         isRunning = false
+        apu.stopAudio()
+    }
+
+    /// Suspende sem resetar: usado quando o painel do notch recolhe.
+    func suspend(fadeDuration: TimeInterval = 0.15) {
+        guard isRunning else { return }
+        isRunning = false
+        apu.suspendAudio(fadeDuration: fadeDuration)
+    }
+
+    /// Retoma exatamente de onde parou.
+    func resume() {
+        guard !isRunning else { return }
+        isRunning = true
+        apu.startAudio()
     }
 }
 
-// Erro personalizado
-enum EmulatorError: Error {
+enum EmulatorError: Error, LocalizedError {
     case invalidROM
     case romLoadError
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidROM:   return "Arquivo não parece ser uma ROM de SNES válida"
+        case .romLoadError: return "Falha ao ler o arquivo da ROM"
+        }
+    }
 }
 
-
-// Estado salvo para save states
 extension SNES {
     struct SaveState: Codable {
         let cpuState: CPU65816.State
@@ -129,7 +156,7 @@ extension SNES {
         let memoryState: MemoryBus.State
         let totalCycles: UInt64
     }
-    
+
     func createSaveState() -> SaveState {
         return SaveState(
             cpuState: cpu.getState(),
@@ -139,7 +166,7 @@ extension SNES {
             totalCycles: totalCycles
         )
     }
-    
+
     func loadSaveState(_ state: SaveState) {
         cpu.setState(state.cpuState)
         ppu.setState(state.ppuState)

@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# Xcode
+.derivedData/
+DerivedData/
+build/
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+*.moved-aside
+
+# Artefatos de distribuição
+dist/
+*.dmg
+
+# Saves gerados em runtime
+*.srm

@@ -7,24 +7,28 @@
 
 import Cocoa
 
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
 
-class AppDelegate: NSObject, NSApplicationDelegate {
-
-    @IBOutlet var window: NSWindow!
-
+    private var viewModel: EmulatorViewModel?
+    private var notchController: NotchWindowController?
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
-        // Insert code here to initialize your application
+        // App acessório: sem ícone no Dock e sem barra de menus própria.
+        NSApp.setActivationPolicy(.accessory)
+
+        let viewModel = EmulatorViewModel()
+        let controller = NotchWindowController(viewModel: viewModel)
+        self.viewModel = viewModel
+        self.notchController = controller
+        controller.show()
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {
-        // Insert code here to tear down your application
+        viewModel?.stopEmulation()
     }
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
         return true
     }
-
-
 }
-

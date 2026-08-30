@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "52D70C062DD4DF53001DC722"
-               BuildableName = "snes.app"
-               BlueprintName = "snes"
-               ReferencedContainer = "container:snes.xcodeproj">
+               BuildableName = "NotchSnes.app"
+               BlueprintName = "NotchSnes"
+               ReferencedContainer = "container:NotchSnes.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -45,9 +45,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "52D70C062DD4DF53001DC722"
-            BuildableName = "snes.app"
-            BlueprintName = "snes"
-            ReferencedContainer = "container:snes.xcodeproj">
+            BuildableName = "NotchSnes.app"
+            BlueprintName = "NotchSnes"
+            ReferencedContainer = "container:NotchSnes.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -62,9 +62,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "52D70C062DD4DF53001DC722"
-            BuildableName = "snes.app"
-            BlueprintName = "snes"
-            ReferencedContainer = "container:snes.xcodeproj">
+            BuildableName = "NotchSnes.app"
+            BlueprintName = "NotchSnes"
+            ReferencedContainer = "container:NotchSnes.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

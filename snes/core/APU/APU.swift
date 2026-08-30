@@ -1,208 +1,184 @@
-//
-//  APU.swift
-//  snes
-//
-//  Created by Arilson Simplicio on 14/05/25.
-//
-
-
 // APU.swift
-import Foundation
-import AVFoundation
+// SPC700 + IPL ROM + S-DSP, avançado pelo orçamento de ciclos do 65816 em SNES.runFrame().
 
-class APU {
-    // Registradores de comunicação com CPU
-    private var cpuToApuPorts: [UInt8] = [0, 0, 0, 0]
-    private var apuToCpuPorts: [UInt8] = [0, 0, 0, 0]
-    
-    // Estado do DSP
-    private var dspRegisters: [UInt8] = Array(repeating: 0, count: 128)
-    
-    // RAM do APU (64KB)
-    private var ram: [UInt8] = Array(repeating: 0, count: 0x10000)
-    
-    // Timer/Counter
-    private var timer: [Int] = [0, 0, 0]
-    private var timerTarget: [Int] = [0, 0, 0]
-    private var timerEnabled: [Bool] = [false, false, false]
-    
-    // Buffer de áudio
-    private var audioBuffer: [Float] = []
-    private var audioSampleRate: Double = 32000.0
-    
-    // Referência para memória
-    private weak var memory: MemoryBus?
-    
-    // Estado interno
-    private var cycles: Int = 0
-    
-    init(memory: MemoryBus) {
-        self.memory = memory
+import Foundation
+
+final class APU {
+    private static let masterPerCPUCycle = 8.0
+    private static let masterClockHz = 21_477_272.0
+    private static let spcClockHz = 2_048_000.0
+    private static let spcCyclesPerDSPSample = spcClockHz / 32_000.0
+
+    let spc700 = SPC700()
+    let dsp = DSP()
+    let audioOutput = AudioOutput()
+
+    private var spcCycleDebt = 0.0
+    private var dspCycleAccumulator = 0.0
+    private var pendingAudioLeft: [Int16] = []
+    private var pendingAudioRight: [Int16] = []
+
+    init() {
+        spc700.dsp = dsp
+        dsp.readRAM = { [weak self] addr in
+            self?.spc700.ram[Int(addr)] ?? 0
+        }
+        dsp.writeRAM = { [weak self] addr, val in
+            self?.spc700.ram[Int(addr)] = val
+        }
+        pendingAudioLeft.reserveCapacity(1024)
+        pendingAudioRight.reserveCapacity(1024)
         reset()
     }
-    
+
     func reset() {
-        for i in 0..<cpuToApuPorts.count {
-            cpuToApuPorts[i] = 0
-        }
-        for i in 0..<apuToCpuPorts.count {
-            apuToCpuPorts[i] = 0
-        }
-        for i in 0..<dspRegisters.count {
-            dspRegisters[i] = 0
-        }
-        for i in 0..<ram.count {
-            ram[i] = 0
-        }
-        // Carrega boot ROM do APU
-        loadBootROM()
-        
-        cycles = 0
-        
-        // Inicializa timers
-        for i in 0..<3 {
-            timer[i] = 0
-            timerTarget[i] = 0
-            timerEnabled[i] = false
+        for i in 0..<spc700.ram.count { spc700.ram[i] = 0 }
+        spc700.reset()
+        dsp.reset()
+        spcCycleDebt = 0
+        dspCycleAccumulator = 0
+        pendingAudioLeft.removeAll(keepingCapacity: true)
+        pendingAudioRight.removeAll(keepingCapacity: true)
+    }
+
+    // MARK: - Portas ($2140-$2143)
+
+    func readPort(_ index: Int) -> UInt8 {
+        spc700.portsToCPU[index & 3]
+    }
+
+    func writePort(_ index: Int, _ value: UInt8) {
+        spc700.portsFromCPU[index & 3] = value
+    }
+
+    func readRegister(_ address: UInt16) -> UInt8 { readPort(Int(address & 3)) }
+    func writeRegister(_ address: UInt16, _ value: UInt8) { writePort(Int(address & 3), value) }
+
+    /// `count` is 65816 cycles (this emulator's unit: ~8 master clocks each).
+    func step(cycles count: Int = 1) {
+        guard count > 0 else { return }
+
+        spcCycleDebt += Double(count) * Self.masterPerCPUCycle * Self.spcClockHz / Self.masterClockHz
+        while spcCycleDebt >= 1.0 {
+            let spcCycles = spc700.step()
+            spc700.tickTimers(cpuCycles: spcCycles)
+            runSPCCycles(spcCycles)
+            spcCycleDebt -= Double(spcCycles)
         }
     }
-    
-    // Carrega a boot ROM do APU (simplificada)
-    private func loadBootROM() {
-        // A boot ROM real tem 64 bytes e inicializa o APU
-        // Por enquanto, apenas inicializa com valores básicos
-        
-        // Código simplificado para teste
-        ram[0xFFC0] = 0x2F  // BRA $FFC0 (loop infinito)
-        ram[0xFFC1] = 0xFE
+
+    func flushAudio() {
+        guard !pendingAudioLeft.isEmpty else { return }
+        audioOutput.writeSamples(left: pendingAudioLeft, right: pendingAudioRight)
+        pendingAudioLeft.removeAll(keepingCapacity: true)
+        pendingAudioRight.removeAll(keepingCapacity: true)
     }
-    
-    // Lê registrador (do ponto de vista do CPU)
-    func readRegister(_ address: UInt16) -> UInt8 {
-        switch address & 0xFF {
-        case 0x00...0x03:  // Portas de comunicação
-            return apuToCpuPorts[Int(address & 0x03)]
-            
-        default:
-            return 0
-        }
+
+    func startAudio() {
+        audioOutput.start()
     }
-    
-    // Escreve registrador (do ponto de vista do CPU)
-    func writeRegister(_ address: UInt16, _ value: UInt8) {
-        switch address & 0xFF {
-        case 0x00...0x03:  // Portas de comunicação
-            cpuToApuPorts[Int(address & 0x03)] = value
-            
-        default:
-            break
-        }
+
+    func stopAudio() {
+        flushAudio()
+        audioOutput.stop()
     }
-    
-    // Executa um passo do APU
-    func step() {
-        cycles += 1
-        
-        // APU roda a aproximadamente 1.024 MHz
-        // Por enquanto, apenas atualiza timers
-        updateTimers()
-        
-        // TODO: Executar SPC700 (CPU do APU)
-        // TODO: Processar DSP
-        // TODO: Gerar samples de áudio
+
+    /// Para com rampa de volume, evitando o estalo do buffer cortado no meio.
+    func suspendAudio(fadeDuration: TimeInterval) {
+        flushAudio()
+        audioOutput.fadeOutAndStop(duration: fadeDuration)
     }
-    
-    // Atualiza timers
-    private func updateTimers() {
-        // Timer 0 e 1: 8192 Hz (a cada 125 ciclos)
-        // Timer 2: 64 Hz (a cada 16000 ciclos)
-        
-        if cycles % 125 == 0 {
-            // Timers 0 e 1
-            for i in 0..<2 {
-                if timerEnabled[i] {
-                    timer[i] += 1
-                    if timer[i] >= timerTarget[i] {
-                        timer[i] = 0
-                        // TODO: Gerar interrupção
-                    }
-                }
+
+    private func runSPCCycles(_ cycles: Int) {
+        guard !spc700.bootRomEnabled else { return }
+
+        dspCycleAccumulator += Double(cycles)
+        while dspCycleAccumulator >= Self.spcCyclesPerDSPSample {
+            let sample = dsp.generateSample()
+            pendingAudioLeft.append(sample.left)
+            pendingAudioRight.append(sample.right)
+            if pendingAudioLeft.count >= 1024 {
+                flushAudio()
             }
-        }
-        
-        if cycles % 16000 == 0 {
-            // Timer 2
-            if timerEnabled[2] {
-                timer[2] += 1
-                if timer[2] >= timerTarget[2] {
-                    timer[2] = 0
-                    // TODO: Gerar interrupção
-                }
-            }
+            dspCycleAccumulator -= Self.spcCyclesPerDSPSample
         }
     }
-    
-    // DSP - Digital Signal Processor
-    private func processDSP() {
-        // O DSP tem 8 vozes, cada uma pode reproduzir samples
-        // Por enquanto, apenas placeholder
-        
-        // TODO: Implementar processamento de áudio real
-        // - Decodificar BRR samples
-        // - Aplicar envelope ADSR
-        // - Mixar vozes
-        // - Aplicar efeitos (echo, etc)
-    }
-    
-    // Gera sample de áudio
-    private func generateAudioSample() -> Float {
-        // Por enquanto, retorna silêncio
-        return 0.0
-    }
-    
-    // Obtém buffer de áudio
-    func getAudioBuffer() -> [Float] {
-        return audioBuffer
-    }
-    
-    // Limpa buffer de áudio
-    func clearAudioBuffer() {
-        audioBuffer.removeAll()
-    }
-    
-    // Estado para save states
+
     struct State: Codable {
-        let cpuToApuPorts: [UInt8]
-        let apuToCpuPorts: [UInt8]
-        let dspRegisters: [UInt8]
         let ram: [UInt8]
-        let timer: [Int]
-        let timerTarget: [Int]
+        let portsFromCPU: [UInt8]
+        let portsToCPU: [UInt8]
+        let a: UInt8
+        let x: UInt8
+        let y: UInt8
+        let sp: UInt8
+        let pc: UInt16
+        let psw: UInt8
+        let dspAddr: UInt8
+        let bootRomEnabled: Bool
+        let stopped: Bool
+        let sleeping: Bool
+        let dspRegisters: [UInt8]
+        let spcCycleDebt: Double
+        let dspCycleAccumulator: Double
         let timerEnabled: [Bool]
-        let cycles: Int
+        let timerDivisor: [UInt8]
+        let timerCounter: [UInt8]
+        let timerInternal: [UInt16]
     }
-    
+
     func getState() -> State {
-        return State(
-            cpuToApuPorts: cpuToApuPorts,
-            apuToCpuPorts: apuToCpuPorts,
-            dspRegisters: dspRegisters,
-            ram: ram,
-            timer: timer,
-            timerTarget: timerTarget,
-            timerEnabled: timerEnabled,
-            cycles: cycles
+        State(
+            ram: spc700.ram,
+            portsFromCPU: spc700.portsFromCPU,
+            portsToCPU: spc700.portsToCPU,
+            a: spc700.a,
+            x: spc700.x,
+            y: spc700.y,
+            sp: spc700.sp,
+            pc: spc700.pc,
+            psw: spc700.psw,
+            dspAddr: spc700.dspAddr,
+            bootRomEnabled: spc700.bootRomEnabled,
+            stopped: spc700.stopped,
+            sleeping: spc700.sleeping,
+            dspRegisters: dsp.regs,
+            spcCycleDebt: spcCycleDebt,
+            dspCycleAccumulator: dspCycleAccumulator,
+            timerEnabled: spc700.timerEnabled,
+            timerDivisor: spc700.timerDivisor,
+            timerCounter: spc700.timerCounter,
+            timerInternal: spc700.timerInternal
         )
     }
-    
+
     func setState(_ state: State) {
-        cpuToApuPorts = state.cpuToApuPorts
-        apuToCpuPorts = state.apuToCpuPorts
-        dspRegisters = state.dspRegisters
-        ram = state.ram
-        timer = state.timer
-        timerTarget = state.timerTarget
-        timerEnabled = state.timerEnabled
-        cycles = state.cycles
+        reset()
+        if state.ram.count == spc700.ram.count {
+            spc700.ram = state.ram
+        }
+        spc700.portsFromCPU = state.portsFromCPU
+        spc700.portsToCPU = state.portsToCPU
+        spc700.a = state.a
+        spc700.x = state.x
+        spc700.y = state.y
+        spc700.sp = state.sp
+        spc700.pc = state.pc
+        spc700.psw = state.psw
+        spc700.dspAddr = state.dspAddr
+        spc700.bootRomEnabled = state.bootRomEnabled
+        spc700.stopped = state.stopped
+        spc700.sleeping = state.sleeping
+        if state.dspRegisters.count == dsp.regs.count {
+            dsp.regs = state.dspRegisters
+        }
+        spcCycleDebt = state.spcCycleDebt
+        dspCycleAccumulator = state.dspCycleAccumulator
+        if state.timerEnabled.count == 3 {
+            spc700.timerEnabled = state.timerEnabled
+            spc700.timerDivisor = state.timerDivisor
+            spc700.timerCounter = state.timerCounter
+            spc700.timerInternal = state.timerInternal
+        }
     }
 }

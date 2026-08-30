@@ -1,13 +1,7 @@
-//
-//  CPU.swift
-//  snes
-//
-//  Created by Arilson Simplicio on 14/05/25.
-//
+// CPU.swift
 import Foundation
 
-class CPU65816 {
-    // Registradores
+final class CPU65816 {
     var a: UInt16 = 0      // Acumulador
     var x: UInt16 = 0      // Índice X
     var y: UInt16 = 0      // Índice Y
@@ -18,7 +12,6 @@ class CPU65816 {
     var pc: UInt16 = 0     // Program Counter
     var p: UInt8 = 0x34    // Status Register
     
-    // Flags do Status Register
     enum StatusFlag: UInt8 {
         case carry = 0x01      // C
         case zero = 0x02       // Z
@@ -30,95 +23,151 @@ class CPU65816 {
         case negative = 0x80   // N
     }
     
-    // Referência para memória
-    private var memory: MemoryBus
+    private unowned let memory: MemoryBus
     
-    // Estado do processador
     var cycles: Int = 0
     var isEmulationMode: Bool = true
-    
+
+    var nmiPending: Bool = false
+    var irqPending: Bool = false
+
+    var waiting: Bool = false
+    var stopped: Bool = false
+
+    private(set) var unimplementedOpcodes: Int = 0
+
     init(memory: MemoryBus) {
         self.memory = memory
         reset()
     }
     private var instructionCount: Int = 0
-    // Reset do CPU
+
+    // Trigger NMI (called by PPU during VBlank)
+    func triggerNMI() {
+        nmiPending = true
+    }
+
+    func triggerIRQ() {
+        irqPending = true
+    }
     func reset() {
-        // Limpa registradores primeiro
         a = 0
         x = 0
         y = 0
         d = 0
         db = 0
-        
-        // Estado inicial
+
         s = 0x01FF
         p = 0x34  // IRQ desabilitado, modo 8-bit
         isEmulationMode = true
         pb = 0
-        
+
+        waiting = false
+        stopped = false
+        nmiPending = false
+        irqPending = false
+        instructionCount = 0
+
         // Lê vetor de reset do banco 0
         pc = memory.read16(0x00FFFC)
-        
-        print("=== CPU Reset ===")
-        print("PC inicial: \(String(format: "$%02X:%04X", pb, pc))")
-        print("Vetor de reset lido de $00FFFC: \(String(format: "$%04X", pc))")
-        
-        // Debug: vamos ver o que tem no endereço do reset
-        print("Primeiros 16 bytes no PC inicial:")
-        for i in 0..<16 {
-            let offset = Int(pc) + i
-            if offset <= 0xFFFF {
-                let address = UInt32(pb) << 16 | UInt32(offset)
-                let byte = memory.read8(address)
-                print("  [\(String(format: "$%06X", address))] = \(String(format: "$%02X", byte))")
+
+        Log.cpu.info("Reset -> PC $\(String(format: "%02X:%04X", self.pb, self.pc), privacy: .public)")
+    }
+
+    private func handleNMI() {
+        pushByte(pb)
+        pushWord(pc)
+        pushByte(p)
+
+        setFlag(.irqDisable, true)
+
+        if isEmulationMode {
+            pc = memory.read16(0xFFFA)
+            pb = 0
+        } else {
+            pc = memory.read16(0xFFEA)
+            pb = 0
+        }
+
+        setFlag(.decimal, false)
+    }
+
+    private func handleIRQ() {
+        pushByte(pb)
+        pushWord(pc)
+        pushByte(p)
+
+        setFlag(.irqDisable, true)
+
+        if isEmulationMode {
+            pc = memory.read16(0xFFFE)
+            pb = 0
+        } else {
+            pc = memory.read16(0xFFEE)
+            pb = 0
+        }
+
+        setFlag(.decimal, false)
+    }
+
+    // Executa uma instrução e devolve os ciclos consumidos
+    @discardableResult
+    func step() -> Int {
+        // WAI: fica parado até chegar uma interrupção
+        if waiting {
+            if nmiPending || irqPending {
+                waiting = false
+            } else {
+                return 1
             }
         }
-        print("================")
-    }
-    
-    // Executa um passo
-    func step() {
+
+        if stopped { return 1 }
+
+        // Interrupções são checadas antes da próxima instrução
+        if nmiPending {
+            nmiPending = false
+            handleNMI()
+            return 7
+        }
+
+        if irqPending && !getFlag(.irqDisable) {
+            irqPending = false
+            handleIRQ()
+            return 7
+        }
+
         let address = UInt32(pb) << 16 | UInt32(pc)
         let opcode = memory.read8(address)
 
-        instructionCount += 1
+        instructionCount &+= 1
 
-        // Debug mais detalhado (descomente para debug)
-        // if instructionCount % 1000 == 0 {
-        //     print("[\(instructionCount)] PC: \(String(format: "$%02X:%04X", pb, pc)) Opcode: \(String(format: "$%02X", opcode))")
-        // }
-
-        // Incrementa PC com overflow correto
         pc = (pc &+ 1) & 0xFFFF
 
         executeInstruction(opcode)
+
+        return CPU65816.cycleTable[Int(opcode)]
     }
-    
-    // Busca próximo byte
+
     private func fetchByte() -> UInt8 {
         let address = UInt32(pb) << 16 | UInt32(pc)
         let byte = memory.read8(address)
 
-        // Incrementa PC com overflow correto
         pc = (pc &+ 1) & 0xFFFF
 
         return byte
     }
     
-    // Busca próxima word
     private func fetchWord() -> UInt16 {
         let low = UInt16(fetchByte())
         let high = UInt16(fetchByte())
         return (high << 8) | low
     }
     
-    // Verifica flag
     func getFlag(_ flag: StatusFlag) -> Bool {
         return (p & flag.rawValue) != 0
     }
     
-    // Define flag
     func setFlag(_ flag: StatusFlag, _ value: Bool) {
         if value {
             p |= flag.rawValue
@@ -127,75 +176,136 @@ class CPU65816 {
         }
     }
     
-    // Atualiza flags N e Z baseado no valor
     private func updateNZ(_ value: UInt16) {
         if getFlag(.memory) {
-            // Modo 8-bit
             setFlag(.zero, (value & 0xFF) == 0)
             setFlag(.negative, (value & 0x80) != 0)
         } else {
-            // Modo 16-bit
             setFlag(.zero, value == 0)
             setFlag(.negative, (value & 0x8000) != 0)
         }
     }
     
-    // Executa instrução
     private func executeInstruction(_ opcode: UInt8) {
         switch opcode {
             // Load A
         case 0xA9: LDA_immediate()          // LDA #
         case 0xA5: // LDA dp
             let addr = getDirectPageAddress()
-            a = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
+            // Em 8 bits o LDA preserva o byte alto do acumulador (registrador B)
+            if getFlag(.memory) {
+                a = (a & 0xFF00) | UInt16(memory.read8(addr))
+            } else {
+                a = memory.read16(addr)
+            }
             updateNZ(a)
         case 0xB5: // LDA dp,X
             let addr = getDirectPageXAddress()
-            a = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
+            // Em 8 bits o LDA preserva o byte alto do acumulador (registrador B)
+            if getFlag(.memory) {
+                a = (a & 0xFF00) | UInt16(memory.read8(addr))
+            } else {
+                a = memory.read16(addr)
+            }
             updateNZ(a)
         case 0xAD: // LDA abs
             let addr = getAbsoluteAddress()
-            a = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
+            // Em 8 bits o LDA preserva o byte alto do acumulador (registrador B)
+            if getFlag(.memory) {
+                a = (a & 0xFF00) | UInt16(memory.read8(addr))
+            } else {
+                a = memory.read16(addr)
+            }
             updateNZ(a)
         case 0xBD: // LDA abs,X
             let addr = getAbsoluteXAddress()
-            a = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
+            // Em 8 bits o LDA preserva o byte alto do acumulador (registrador B)
+            if getFlag(.memory) {
+                a = (a & 0xFF00) | UInt16(memory.read8(addr))
+            } else {
+                a = memory.read16(addr)
+            }
             updateNZ(a)
         case 0xB9: // LDA abs,Y
             let addr = getAbsoluteYAddress()
-            a = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
+            // Em 8 bits o LDA preserva o byte alto do acumulador (registrador B)
+            if getFlag(.memory) {
+                a = (a & 0xFF00) | UInt16(memory.read8(addr))
+            } else {
+                a = memory.read16(addr)
+            }
             updateNZ(a)
         case 0xAF: // LDA long
             let addr = fetchLong()
-            a = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
+            // Em 8 bits o LDA preserva o byte alto do acumulador (registrador B)
+            if getFlag(.memory) {
+                a = (a & 0xFF00) | UInt16(memory.read8(addr))
+            } else {
+                a = memory.read16(addr)
+            }
             updateNZ(a)
         case 0xBF: // LDA long,X
             let addr = fetchLong() + UInt32(x)
-            a = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
+            // Em 8 bits o LDA preserva o byte alto do acumulador (registrador B)
+            if getFlag(.memory) {
+                a = (a & 0xFF00) | UInt16(memory.read8(addr))
+            } else {
+                a = memory.read16(addr)
+            }
             updateNZ(a)
         case 0xA7: // LDA [dp]
             let addr = getIndirectLongAddress()
-            a = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
+            // Em 8 bits o LDA preserva o byte alto do acumulador (registrador B)
+            if getFlag(.memory) {
+                a = (a & 0xFF00) | UInt16(memory.read8(addr))
+            } else {
+                a = memory.read16(addr)
+            }
             updateNZ(a)
         case 0xA1: // LDA (dp,X)
             let addr = getIndexedIndirectAddress()
-            a = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
+            // Em 8 bits o LDA preserva o byte alto do acumulador (registrador B)
+            if getFlag(.memory) {
+                a = (a & 0xFF00) | UInt16(memory.read8(addr))
+            } else {
+                a = memory.read16(addr)
+            }
             updateNZ(a)
         case 0xB1: // LDA (dp),Y
             let addr = getIndirectIndexedAddress()
-            a = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
+            // Em 8 bits o LDA preserva o byte alto do acumulador (registrador B)
+            if getFlag(.memory) {
+                a = (a & 0xFF00) | UInt16(memory.read8(addr))
+            } else {
+                a = memory.read16(addr)
+            }
             updateNZ(a)
         case 0xB7: // LDA [dp],Y
             let addr = getIndirectIndexedLongAddress()
-            a = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
+            // Em 8 bits o LDA preserva o byte alto do acumulador (registrador B)
+            if getFlag(.memory) {
+                a = (a & 0xFF00) | UInt16(memory.read8(addr))
+            } else {
+                a = memory.read16(addr)
+            }
             updateNZ(a)
         case 0xA3: // LDA sr,S
             let addr = getStackRelativeAddress()
-            a = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
+            // Em 8 bits o LDA preserva o byte alto do acumulador (registrador B)
+            if getFlag(.memory) {
+                a = (a & 0xFF00) | UInt16(memory.read8(addr))
+            } else {
+                a = memory.read16(addr)
+            }
             updateNZ(a)
         case 0xB3: // LDA (sr,S),Y
             let addr = getStackRelativeIndirectIndexedAddress()
-            a = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
+            // Em 8 bits o LDA preserva o byte alto do acumulador (registrador B)
+            if getFlag(.memory) {
+                a = (a & 0xFF00) | UInt16(memory.read8(addr))
+            } else {
+                a = memory.read16(addr)
+            }
             updateNZ(a)
             
             // Store A
@@ -289,20 +399,40 @@ class CPU65816 {
         case 0xA2: LDX_immediate()          // LDX #
         case 0xA6: // LDX dp
             let addr = getDirectPageAddress()
-            x = getFlag(.index) ? UInt16(memory.read8(addr)) : memory.read16(addr)
-            updateNZ(x)
+            if getFlag(.index) {
+                x = UInt16(memory.read8(addr))
+                updateNZ8(UInt8(x))
+            } else {
+                x = memory.read16(addr)
+                updateNZ16(x)
+            }
         case 0xB6: // LDX dp,Y
             let addr = getDirectPageYAddress()
-            x = getFlag(.index) ? UInt16(memory.read8(addr)) : memory.read16(addr)
-            updateNZ(x)
+            if getFlag(.index) {
+                x = UInt16(memory.read8(addr))
+                updateNZ8(UInt8(x))
+            } else {
+                x = memory.read16(addr)
+                updateNZ16(x)
+            }
         case 0xAE: // LDX abs
             let addr = getAbsoluteAddress()
-            x = getFlag(.index) ? UInt16(memory.read8(addr)) : memory.read16(addr)
-            updateNZ(x)
+            if getFlag(.index) {
+                x = UInt16(memory.read8(addr))
+                updateNZ8(UInt8(x))
+            } else {
+                x = memory.read16(addr)
+                updateNZ16(x)
+            }
         case 0xBE: // LDX abs,Y
             let addr = getAbsoluteYAddress()
-            x = getFlag(.index) ? UInt16(memory.read8(addr)) : memory.read16(addr)
-            updateNZ(x)
+            if getFlag(.index) {
+                x = UInt16(memory.read8(addr))
+                updateNZ8(UInt8(x))
+            } else {
+                x = memory.read16(addr)
+                updateNZ16(x)
+            }
             
         case 0x86: // STX dp
             let addr = getDirectPageAddress()
@@ -324,20 +454,40 @@ class CPU65816 {
         case 0xA0: LDY_immediate()          // LDY #
         case 0xA4: // LDY dp
             let addr = getDirectPageAddress()
-            y = getFlag(.index) ? UInt16(memory.read8(addr)) : memory.read16(addr)
-            updateNZ(y)
+            if getFlag(.index) {
+                y = UInt16(memory.read8(addr))
+                updateNZ8(UInt8(y))
+            } else {
+                y = memory.read16(addr)
+                updateNZ16(y)
+            }
         case 0xB4: // LDY dp,X
             let addr = getDirectPageXAddress()
-            y = getFlag(.index) ? UInt16(memory.read8(addr)) : memory.read16(addr)
-            updateNZ(y)
+            if getFlag(.index) {
+                y = UInt16(memory.read8(addr))
+                updateNZ8(UInt8(y))
+            } else {
+                y = memory.read16(addr)
+                updateNZ16(y)
+            }
         case 0xAC: // LDY abs
             let addr = getAbsoluteAddress()
-            y = getFlag(.index) ? UInt16(memory.read8(addr)) : memory.read16(addr)
-            updateNZ(y)
+            if getFlag(.index) {
+                y = UInt16(memory.read8(addr))
+                updateNZ8(UInt8(y))
+            } else {
+                y = memory.read16(addr)
+                updateNZ16(y)
+            }
         case 0xBC: // LDY abs,X
             let addr = getAbsoluteXAddress()
-            y = getFlag(.index) ? UInt16(memory.read8(addr)) : memory.read16(addr)
-            updateNZ(y)
+            if getFlag(.index) {
+                y = UInt16(memory.read8(addr))
+                updateNZ8(UInt8(y))
+            } else {
+                y = memory.read16(addr)
+                updateNZ16(y)
+            }
             
         case 0x84: // STY dp
             let addr = getDirectPageAddress()
@@ -380,12 +530,12 @@ class CPU65816 {
             }
             
             // Transfer Operations
-        case 0xAA: TAX()                    // TAX
-        case 0xA8: TAY()                    // TAY
-        case 0x8A: TXA()                    // TXA
-        case 0x98: TYA()                    // TYA
-        case 0xBA: TSX()                    // TSX
-        case 0x9A: TXS()                    // TXS
+        case 0xAA: TAX()
+        case 0xA8: TAY()
+        case 0x8A: TXA()
+        case 0x98: TYA()
+        case 0xBA: TSX()
+        case 0x9A: TXS()
         case 0x5B: // TCD
             d = a
             updateNZ16(d)
@@ -420,7 +570,7 @@ class CPU65816 {
                 updateNZ16(x)
             }
         case 0x02: // COP
-            let signature = fetchByte()
+            _ = fetchByte()   // byte de assinatura: ignorado pelo hardware
             pushByte(pb)
             pushWord(pc)
             pushByte(p)
@@ -434,16 +584,11 @@ class CPU65816 {
             cycles += 2
 
         case 0xCB: // WAI - Wait for Interrupt
-            // Por enquanto, só incrementa ciclos
-            // Em uma implementação completa, pausaria até uma interrupção
-            cycles += 3
+            waiting = true
 
         case 0xDB: // STP - Stop the Clock
-            // Para o processador até reset
-            // Por enquanto, apenas incrementa ciclos
-            cycles += 3
+            stopped = true
         case 0x00: // BRK
-            print("BRK encontrado no PC: \(String(format: "$%02X:%04X", pb, pc - 1))")
             pushByte(pb)
             pushWord(pc + 1)
             pushByte(p | 0x10)  // Set B flag
@@ -473,14 +618,14 @@ class CPU65816 {
                 s = (s & 0xFF) | 0x0100 // Stack na página 1
             }
             // Stack Operations
-        case 0x48: PHA()                    // PHA
-        case 0x68: PLA()                    // PLA
-        case 0xDA: PHX()                    // PHX
-        case 0xFA: PLX()                    // PLX
-        case 0x5A: PHY()                    // PHY
-        case 0x7A: PLY()                    // PLY
-        case 0x08: PHP()                    // PHP
-        case 0x28: PLP()                    // PLP
+        case 0x48: PHA()
+        case 0x68: PLA()
+        case 0xDA: PHX()
+        case 0xFA: PLX()
+        case 0x5A: PHY()
+        case 0x7A: PLY()
+        case 0x08: PHP()
+        case 0x28: PLP()
         case 0x8B: // PHB
             pushByte(db)
         case 0xAB: // PLB
@@ -618,10 +763,10 @@ class CPU65816 {
             // INC/DEC Operations
         case 0x1A: INC_accumulator()        // INC A
         case 0x3A: DEC_accumulator()        // DEC A
-        case 0xE8: INX()                    // INX
-        case 0xCA: DEX()                    // DEX
-        case 0xC8: INY()                    // INY
-        case 0x88: DEY()                    // DEY
+        case 0xE8: INX()
+        case 0xCA: DEX()
+        case 0xC8: INY()
+        case 0x88: DEY()
         case 0xE6: // INC dp
             let addr = getDirectPageAddress()
             INC_memory(addr)
@@ -890,9 +1035,13 @@ class CPU65816 {
             CPY_value(operand)
             
             // Bit Operations
-        case 0x89: // BIT #
+        case 0x89: // BIT # - o modo imediato mexe só no Z, não em N/V
             let operand = getFlag(.memory) ? UInt16(fetchByte()) : fetchWord()
-            BIT_value(operand)
+            if getFlag(.memory) {
+                setFlag(.zero, (a & operand & 0xFF) == 0)
+            } else {
+                setFlag(.zero, (a & operand) == 0)
+            }
         case 0x24: // BIT dp
             let addr = getDirectPageAddress()
             let operand = getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
@@ -968,32 +1117,32 @@ class CPU65816 {
             ROR_memory(addr)
             
             // Branch Operations
-        case 0x90: BCC()                    // BCC
-        case 0xB0: BCS()                    // BCS
-        case 0xF0: BEQ()                    // BEQ
-        case 0xD0: BNE()                    // BNE
-        case 0x30: BMI()                    // BMI
-        case 0x10: BPL()                    // BPL
-        case 0x50: BVC()                    // BVC
-        case 0x70: BVS()                    // BVS
+        case 0x90: BCC()
+        case 0xB0: BCS()
+        case 0xF0: BEQ()
+        case 0xD0: BNE()
+        case 0x30: BMI()
+        case 0x10: BPL()
+        case 0x50: BVC()
+        case 0x70: BVS()
         case 0x80: // BRA (Branch Always)
             branch(true)
         case 0x82: // BRL (Branch Long)
-            let offset = Int16(bitPattern: fetchWord())
-            pc = UInt16(Int16(pc) + offset)
+            let offset = fetchWord()
+            pc = pc &+ offset
             
             // Jump Operations
         case 0x4C: JMP_absolute()           // JMP abs
         case 0x5C: JMP_absoluteLong()       // JMP long
-        case 0x6C: // JMP (abs)
-            let pointer = getAbsoluteAddress()
+        case 0x6C: // JMP (abs) - o ponteiro é lido do banco $00
+            let pointer = UInt32(fetchWord())
             pc = memory.read16(pointer)
-        case 0x7C: // JMP (abs,X)
+        case 0x7C: // JMP (abs,X) - ponteiro no banco do programa
             let base = fetchWord()
             let pointer = UInt32(pb) << 16 | UInt32(base &+ x)
             pc = memory.read16(pointer)
-        case 0xDC: // JMP [abs]
-            let pointer = getAbsoluteAddress()
+        case 0xDC: // JMP [abs] - ponteiro de 24 bits no banco $00
+            let pointer = UInt32(fetchWord())
             let addr = memory.read24(pointer)
             pb = UInt8((addr >> 16) & 0xFF)
             pc = UInt16(addr & 0xFFFF)
@@ -1001,13 +1150,14 @@ class CPU65816 {
         case 0x20: JSR_absolute()           // JSR abs
         case 0x22: JSL_absoluteLong()       // JSL long
         case 0xFC: // JSR (abs,X)
+            // O alvo vem do ponteiro em pb:(base+X), não do endereço em si.
             let base = fetchWord()
-            let addr = base &+ x
-            pushWord(pc - 1)
-            pc = addr
+            let pointer = UInt32(pb) << 16 | UInt32(base &+ x)
+            pushWord(pc &- 1)
+            pc = memory.read16(pointer)
             
-        case 0x60: RTS()                    // RTS
-        case 0x6B: RTL()                    // RTL
+        case 0x60: RTS()
+        case 0x6B: RTL()
         case 0x40: // RTI
             p = popByte()
             if isEmulationMode {
@@ -1019,16 +1169,16 @@ class CPU65816 {
             }
             
             // Flag Operations
-        case 0x18: CLC()                    // CLC
-        case 0x38: SEC()                    // SEC
-        case 0x58: CLI()                    // CLI
-        case 0x78: SEI()                    // SEI
-        case 0xD8: CLD()                    // CLD
-        case 0xF8: SED()                    // SED
-        case 0xB8: CLV()                    // CLV
-        case 0xC2: REP()                    // REP
-        case 0xE2: SEP()                    // SEP
-        case 0xEA: break                    // NOP
+        case 0x18: CLC()
+        case 0x38: SEC()
+        case 0x58: CLI()
+        case 0x78: SEI()
+        case 0xD8: CLD()
+        case 0xF8: SED()
+        case 0xB8: CLV()
+        case 0xC2: REP()
+        case 0xE2: SEP()
+        case 0xEA: break  // NOP
 
             // Misc Operations
         case 0x44: // MVP (Block Move Negative)
@@ -1045,8 +1195,9 @@ class CPU65816 {
                 a = a &- 1
                 x = x &- 1
                 y = y &- 1
+                // Com o flag X ativo os índices são de 8 bits
+                if getFlag(.index) { x &= 0xFF; y &= 0xFF }
 
-                // Add cycles per byte
                 cycles += 7
             }
             db = dest
@@ -1065,8 +1216,9 @@ class CPU65816 {
                 a = a &- 1
                 x = x &+ 1
                 y = y &+ 1
+                // Com o flag X ativo os índices são de 8 bits
+                if getFlag(.index) { x &= 0xFF; y &= 0xFF }
 
-                // Add cycles per byte
                 cycles += 7
             }
             db = dest
@@ -1085,32 +1237,35 @@ class CPU65816 {
             let addr = getAbsoluteAddress()
             TRB_memory(addr)
             
-        default:
-            print("Opcode não implementado: \(String(format: "$%02X", opcode)) at PC: \(String(format: "$%02X:%04X", pb, pc - 1))")
-                
-            // Mostra contexto ao redor
-            print("  Contexto:")
-            for i in -5...5 {
-                let offset = Int32(pc) - 1 + Int32(i)
-                if offset >= 0 && offset <= 0xFFFF {
-                    let addr = UInt32(pb) << 16 | UInt32(offset)
-                    let byte = memory.read8(addr)
-                    if i == 0 {
-                        print("  > [\(String(format: "$%06X", addr))] = \(String(format: "$%02X", byte)) <-- PC")
-                    } else {
-                        print("    [\(String(format: "$%06X", addr))] = \(String(format: "$%02X", byte))")
-                    }
-                }
+        // Endereçamento (dp) — indireto simples, sem índice
+        case 0x12: // ORA (dp)
+            ORA_value(readOperand(getDirectPageIndirectAddress()))
+        case 0x32: // AND (dp)
+            AND_value(readOperand(getDirectPageIndirectAddress()))
+        case 0x52: // EOR (dp)
+            EOR_value(readOperand(getDirectPageIndirectAddress()))
+        case 0x72: // ADC (dp)
+            ADC_value(readOperand(getDirectPageIndirectAddress()))
+        case 0x92: // STA (dp)
+            writeAccumulator(getDirectPageIndirectAddress())
+        case 0xB2: // LDA (dp)
+            let addr = getDirectPageIndirectAddress()
+            if getFlag(.memory) {
+                a = (a & 0xFF00) | UInt16(memory.read8(addr))
+            } else {
+                a = memory.read16(addr)
             }
-            
-            // Estado dos registradores
-            print("  Registradores:")
-            print("    A: \(String(format: "$%04X", a))  X: \(String(format: "$%04X", x))  Y: \(String(format: "$%04X", y))")
-            print("    S: \(String(format: "$%04X", s))  D: \(String(format: "$%04X", d))  P: \(String(format: "$%02X", p))")
-            print("    DB: \(String(format: "$%02X", db))  PB: \(String(format: "$%02X", pb))")
-            
-            // Força um NOP para continuar
-            cycles += 2
+            updateNZ(a)
+        case 0xD2: // CMP (dp)
+            CMP_value(readOperand(getDirectPageIndirectAddress()))
+        case 0xF2: // SBC (dp)
+            SBC_value(readOperand(getDirectPageIndirectAddress()))
+
+        default:
+            unimplementedOpcodes += 1
+            if unimplementedOpcodes <= 20 {
+                Log.cpu.error("Opcode não implementado $\(String(format: "%02X", opcode), privacy: .public) em $\(String(format: "%02X:%04X", self.pb, self.pc &- 1), privacy: .public)")
+            }
         }
     }
     
@@ -1140,6 +1295,28 @@ class CPU65816 {
         let pointer = UInt32(d &+ UInt16(base))
         let addr = memory.read24(pointer)
         return addr + UInt32(y)
+    }
+
+    /// (dp) — ponteiro de 16 bits na página direta (banco 0), somado ao banco de dados.
+    @inline(__always)
+    private func readOperand(_ addr: UInt32) -> UInt16 {
+        return getFlag(.memory) ? UInt16(memory.read8(addr)) : memory.read16(addr)
+    }
+
+    @inline(__always)
+    private func writeAccumulator(_ addr: UInt32) {
+        if getFlag(.memory) {
+            memory.write8(addr, UInt8(a & 0xFF))
+        } else {
+            memory.write16(addr, a)
+        }
+    }
+
+    private func getDirectPageIndirectAddress() -> UInt32 {
+        let offset = fetchByte()
+        let pointer = UInt32(d &+ UInt16(offset))
+        let target = memory.read16(pointer)
+        return (UInt32(db) << 16) | UInt32(target)
     }
 
     private func getIndexedIndirectAddress() -> UInt32 {
@@ -1273,11 +1450,12 @@ class CPU65816 {
             updateNZ8(UInt8(a & 0xFF))
         } else {
             let result = UInt32(a) + UInt32(operand) + (getFlag(.carry) ? 1 : 0)
-            
+            let truncated = UInt16(truncatingIfNeeded: result)
+
             setFlag(.carry, result > 0xFFFF)
-            setFlag(.overflow, ((a ^ UInt16(result)) & (operand ^ UInt16(result)) & 0x8000) != 0)
-            
-            a = UInt16(result & 0xFFFF)
+            setFlag(.overflow, ((a ^ truncated) & (operand ^ truncated) & 0x8000) != 0)
+
+            a = truncated
             updateNZ16(a)
         }
     }
@@ -1285,19 +1463,21 @@ class CPU65816 {
     private func SBC_value(_ operand: UInt16) {
         if getFlag(.memory) {
             let result = Int16(a & 0xFF) - Int16(operand & 0xFF) - (getFlag(.carry) ? 0 : 1)
-            
+            let truncated = UInt16(bitPattern: result) & 0xFF
+
             setFlag(.carry, result >= 0)
-            setFlag(.overflow, ((a ^ UInt16(bitPattern: result)) & ((a ^ operand) & 0x80)) != 0)
-            
-            a = (a & 0xFF00) | UInt16(UInt8(result & 0xFF))
-            updateNZ8(UInt8(a & 0xFF))
+            setFlag(.overflow, ((a ^ operand) & (a ^ truncated) & 0x80) != 0)
+
+            a = (a & 0xFF00) | truncated
+            updateNZ8(UInt8(truncated))
         } else {
             let result = Int32(a) - Int32(operand) - (getFlag(.carry) ? 0 : 1)
-            
+            let truncated = UInt16(truncatingIfNeeded: result)
+
             setFlag(.carry, result >= 0)
-            setFlag(.overflow, ((a ^ UInt16(result)) & (a ^ operand) & 0x8000) != 0)
-            
-            a = UInt16(result & 0xFFFF)
+            setFlag(.overflow, ((a ^ operand) & (a ^ truncated) & 0x8000) != 0)
+
+            a = truncated
             updateNZ16(a)
         }
     }
@@ -1502,31 +1682,26 @@ class CPU65816 {
         }
     }
     
-    // Cycle counting for instructions
-    private func getBaseCycles(_ opcode: UInt8) -> Int {
-        // This is a simplified version - real cycle counts vary based on
-        // addressing mode, page crosses, and other factors
-        switch opcode {
-        case 0x00: return 7  // BRK
-        case 0x01, 0x03: return 6  // ORA indirect
-        case 0x02: return 7  // COP
-        case 0x04, 0x05: return 3  // TSB/ORA dp
-        case 0x06: return 5  // ASL dp
-        case 0x07: return 6  // ORA [dp]
-        case 0x08: return 3  // PHP
-        case 0x09: return 2  // ORA immediate
-        case 0x0A: return 2  // ASL A
-        case 0x0B: return 4  // PHD
-        case 0x0C: return 6  // TSB abs
-        case 0x0D: return 4  // ORA abs
-        case 0x0E: return 6  // ASL abs
-        case 0x0F: return 5  // ORA long
-        case 0x10: return 2  // BPL
-            
-            // Continue for all opcodes...
-        default: return 2
-        }
-    }
+    // Ciclos base por opcode. Não considera page cross nem modo 16 bits,
+    // mas é o suficiente para o escalonamento CPU/PPU por scanline.
+    static let cycleTable: [Int] = [
+        8, 6, 8, 4, 5, 3, 5, 6, 3, 2, 2, 4, 6, 4, 6, 5,  // $00
+        2, 5, 5, 7, 5, 4, 6, 6, 2, 4, 2, 2, 6, 4, 7, 5,  // $10
+        6, 6, 8, 4, 3, 3, 5, 6, 4, 2, 2, 5, 4, 4, 6, 5,  // $20
+        2, 5, 5, 7, 4, 4, 6, 6, 2, 4, 2, 2, 4, 4, 7, 5,  // $30
+        6, 6, 2, 4, 7, 3, 5, 6, 3, 2, 2, 3, 3, 4, 6, 5,  // $40
+        2, 5, 5, 7, 7, 4, 6, 6, 2, 4, 3, 2, 4, 4, 7, 5,  // $50
+        6, 6, 6, 4, 3, 3, 5, 6, 4, 2, 2, 6, 5, 4, 6, 5,  // $60
+        2, 5, 5, 7, 4, 4, 6, 6, 2, 4, 4, 2, 6, 4, 7, 5,  // $70
+        3, 6, 3, 4, 3, 3, 3, 6, 2, 2, 2, 3, 4, 4, 4, 5,  // $80
+        2, 6, 5, 7, 4, 4, 4, 6, 2, 5, 2, 2, 4, 5, 5, 5,  // $90
+        2, 6, 2, 4, 3, 3, 3, 6, 2, 2, 2, 4, 4, 4, 4, 5,  // $A0
+        2, 5, 5, 7, 4, 4, 4, 6, 2, 4, 2, 2, 4, 4, 4, 5,  // $B0
+        2, 6, 3, 4, 3, 3, 5, 6, 2, 2, 2, 3, 4, 4, 6, 5,  // $C0
+        2, 5, 5, 7, 6, 4, 6, 6, 2, 4, 3, 3, 6, 4, 7, 5,  // $D0
+        2, 6, 3, 4, 3, 3, 5, 6, 2, 2, 2, 3, 4, 4, 6, 5,  // $E0
+        2, 5, 5, 7, 5, 4, 6, 6, 2, 4, 4, 2, 8, 4, 7, 5,  // $F0
+    ]
     
     // MARK: - State Management
     
@@ -1600,13 +1775,24 @@ class CPU65816 {
         let mask = fetchByte()
         p &= ~mask
         if isEmulationMode {
-            p |= 0x30  // Force M and X flags in emulation mode
+            p |= 0x30  // Em emulação M e X ficam sempre ativos
         }
+        applyIndexWidth()
     }
     
     private func SEP() {
         let mask = fetchByte()
         p |= mask
+        applyIndexWidth()
+    }
+
+    /// Com o flag X ativo os registradores de índice são de 8 bits: o byte alto
+    /// é zerado pelo hardware, não apenas ignorado.
+    private func applyIndexWidth() {
+        if getFlag(.index) {
+            x &= 0xFF
+            y &= 0xFF
+        }
     }
     
     private func updateNZ8(_ value: UInt8) {
@@ -1634,8 +1820,10 @@ class CPU65816 {
         let offset = Int8(bitPattern: fetchByte())
         if condition {
             let oldPC = pc
-            pc = UInt16(Int16(pc) + Int16(offset))
-            
+            // Add signed offset to PC using wrapping arithmetic
+            let newPC = Int(pc) + Int(offset)
+            pc = UInt16(truncatingIfNeeded: newPC & 0xFFFF)
+
             // Add cycles for branch taken and page cross
             cycles += 1
             if (oldPC & 0xFF00) != (pc & 0xFF00) {
@@ -1767,7 +1955,7 @@ class CPU65816 {
 
     private func INC_accumulator() {
         if getFlag(.memory) {
-            a = (a & 0xFF00) | ((a + 1) & 0xFF)
+            a = (a & 0xFF00) | ((a &+ 1) & 0xFF)
             updateNZ8(UInt8(a & 0xFF))
         } else {
             a = a &+ 1
@@ -1777,7 +1965,7 @@ class CPU65816 {
 
     private func DEC_accumulator() {
         if getFlag(.memory) {
-            a = (a & 0xFF00) | ((a - 1) & 0xFF)
+            a = (a & 0xFF00) | ((a &- 1) & 0xFF)
             updateNZ8(UInt8(a & 0xFF))
         } else {
             a = a &- 1
@@ -1787,7 +1975,7 @@ class CPU65816 {
 
     private func INX() {
         if getFlag(.index) {
-            x = (x + 1) & 0xFF
+            x = (x &+ 1) & 0xFF
             updateNZ8(UInt8(x))
         } else {
             x = x &+ 1
@@ -1797,7 +1985,7 @@ class CPU65816 {
 
     private func DEX() {
         if getFlag(.index) {
-            x = (x - 1) & 0xFF
+            x = (x &- 1) & 0xFF
             updateNZ8(UInt8(x))
         } else {
             x = x &- 1
@@ -1807,7 +1995,7 @@ class CPU65816 {
 
     private func INY() {
         if getFlag(.index) {
-            y = (y + 1) & 0xFF
+            y = (y &+ 1) & 0xFF
             updateNZ8(UInt8(y))
         } else {
             y = y &+ 1
@@ -1817,7 +2005,7 @@ class CPU65816 {
 
     private func DEY() {
         if getFlag(.index) {
-            y = (y - 1) & 0xFF
+            y = (y &- 1) & 0xFF
             updateNZ8(UInt8(y))
         } else {
             y = y &- 1
@@ -1900,7 +2088,9 @@ class CPU65816 {
     }
 
     private func PHP() {
-        pushByte(p | 0x30)  // Set B flag
+        // Em modo nativo o PHP empilha P sem alterações; só em emulação os
+        // bits 4 e 5 são forçados.
+        pushByte(isEmulationMode ? (p | 0x30) : p)
     }
 
     private func PLP() {
@@ -2047,8 +2237,6 @@ class CPU65816 {
         }
     }
 }
-
-
 
 // Extension for MemoryBus to support 24-bit reads
 extension MemoryBus {
