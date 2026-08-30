@@ -23,6 +23,10 @@ final class NotchPresenter: ObservableObject {
     @Published var showsSettings = false
     /// Regravando uma tecla: o jogo ignora o teclado enquanto isso.
     @Published var rebindingButton: SNESButton?
+    /// Regravando um botão do controle: o próximo botão físico pressionado vira o mapeamento.
+    @Published var rebindingPadButton: SNESButton?
+    /// Há um controle conectado: o jogo pode rodar sem capturar o teclado.
+    @Published var hasGamepad = false
     /// Sem ROM o painel fica sempre aberto.
     @Published var hasROM = false
     /// App ativo (painel com foco). Atualizado pelo controller via notificações.
@@ -44,7 +48,12 @@ final class NotchPresenter: ObservableObject {
     /// Teclado capturado: fixado, nos ajustes, ou simplesmente com o cursor sobre
     /// o painel de um jogo carregado — hover sozinho já vale, senão o jogo roda
     /// sem responder às teclas.
-    var needsKeyboard: Bool { isPinned || showsSettings || (isExpanded && hasROM) }
+    var needsKeyboard: Bool {
+        if showsSettings || rebindingButton != nil { return true }
+        // Com controle, jogar fixado não rouba o teclado de outro app.
+        if hasGamepad && isPinned && !isExpanded { return false }
+        return isPinned || (isExpanded && hasROM)
+    }
     /// O jogo só roda com o painel aberto (ou se a pausa automática estiver desligada).
     var shouldRun: Bool { hasROM && (isOpen || !settings.pauseOnHide) }
 
@@ -88,6 +97,8 @@ final class NotchPresenter: ObservableObject {
         isHovering = false
         isExpanded = false
         showsSettings = false
+        rebindingButton = nil
+        rebindingPadButton = nil
     }
 
     func togglePin() {

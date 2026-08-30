@@ -6,6 +6,7 @@ import SwiftUI
 struct GameBody: View {
     @ObservedObject var vm: EmulatorViewModel
     @ObservedObject var presenter: NotchPresenter
+    @ObservedObject var gamepad: GamepadInput
 
     let videoSize: CGSize
 
@@ -19,7 +20,7 @@ struct GameBody: View {
                         .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
                 )
 
-            ControlsBar(vm: vm, presenter: presenter)
+            ControlsBar(vm: vm, presenter: presenter, gamepad: gamepad)
         }
         .padding(.horizontal, NotchMetrics.contentPadding)
         .padding(.top, 6)
@@ -30,6 +31,7 @@ struct GameBody: View {
 private struct ControlsBar: View {
     @ObservedObject var vm: EmulatorViewModel
     @ObservedObject var presenter: NotchPresenter
+    @ObservedObject var gamepad: GamepadInput
 
     var body: some View {
         HStack(spacing: 7) {
@@ -39,6 +41,19 @@ private struct ControlsBar: View {
             IconButton(symbol: "folder", action: vm.showFileDialog)
 
             Spacer(minLength: 0)
+
+            if gamepad.isConnected {
+                HStack(spacing: 5) {
+                    Image(systemName: "gamecontroller")
+                        .font(.system(size: 11))
+                        .foregroundStyle(NotchPalette.accentSoft)
+                    Text(gamepad.name)
+                        .font(.system(size: 11))
+                        .lineLimit(1)
+                        .foregroundStyle(NotchPalette.primaryText.opacity(0.72))
+                }
+                .padding(.trailing, 4)
+            }
 
             IconButton(symbol: presenter.isPinned ? "pin.fill" : "pin", active: presenter.isPinned,
                        action: presenter.togglePin)

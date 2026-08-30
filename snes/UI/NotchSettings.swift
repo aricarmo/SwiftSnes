@@ -50,6 +50,7 @@ final class NotchSettings: ObservableObject {
         static let audioFade = "notch.audioFade"
         static let clickToOpen = "notch.clickToOpen"
         static let screenSize = "notch.screenSize"
+        static let analogAsDpad = "notch.analogAsDpad"
     }
 
     /// Recolher o painel suspende CPU/PPU/APU.
@@ -64,6 +65,10 @@ final class NotchSettings: ObservableObject {
     @Published var clickToOpen: Bool {
         didSet { defaults.set(clickToOpen, forKey: Key.clickToOpen) }
     }
+    /// Alavanca esquerda do controle também move o direcional.
+    @Published var analogAsDpad: Bool {
+        didSet { defaults.set(analogAsDpad, forKey: Key.analogAsDpad) }
+    }
     /// Tamanho da tela do jogo.
     @Published var screenSize: ScreenSize {
         didSet { defaults.set(screenSize.rawValue, forKey: Key.screenSize) }
@@ -75,11 +80,13 @@ final class NotchSettings: ObservableObject {
         defaults.register(defaults: [
             Key.pauseOnHide: true,
             Key.audioFade: true,
-            Key.clickToOpen: false
+            Key.clickToOpen: false,
+            Key.analogAsDpad: true
         ])
         pauseOnHide = defaults.bool(forKey: Key.pauseOnHide)
         audioFade = defaults.bool(forKey: Key.audioFade)
         clickToOpen = defaults.bool(forKey: Key.clickToOpen)
+        analogAsDpad = defaults.bool(forKey: Key.analogAsDpad)
         screenSize = ScreenSize(rawValue: defaults.string(forKey: Key.screenSize) ?? "") ?? .compact
     }
 

@@ -6,6 +6,7 @@ import SwiftUI
 struct NotchHeader: View {
     @ObservedObject var vm: EmulatorViewModel
     @ObservedObject var presenter: NotchPresenter
+    @ObservedObject var gamepad: GamepadInput
 
     let panelWidth: CGFloat
     let headerHeight: CGFloat
@@ -25,7 +26,7 @@ struct NotchHeader: View {
                 .frame(width: sideWidth, alignment: .leading)
             Spacer(minLength: 0)
                 .frame(width: notchGap)
-            NotchHeaderTrailing(vm: vm, presenter: presenter)
+            NotchHeaderTrailing(vm: vm, presenter: presenter, gamepad: gamepad)
                 .frame(width: sideWidth, alignment: .trailing)
         }
         .padding(.horizontal, Self.horizontalPadding)
@@ -33,6 +34,15 @@ struct NotchHeader: View {
         // cursor em cima, o cabeçalho surge sozinho; o corpo só vem com clique.
         .opacity(presenter.showsHeader ? 1 : 0)
         .animation(.easeInOut(duration: 0.25), value: presenter.showsHeader)
+        // Recolhido, avisa por alguns segundos que um controle acabou de parear.
+        .overlay(alignment: .trailing) {
+            if gamepad.justConnected && !presenter.showsHeader {
+                GamepadBadge(text: "conectado")
+                    .padding(.trailing, Self.horizontalPadding)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: gamepad.justConnected)
         .frame(width: panelWidth, height: headerHeight)
     }
 }
@@ -79,6 +89,7 @@ private struct NotchHeaderLeading: View {
 private struct NotchHeaderTrailing: View {
     @ObservedObject var vm: EmulatorViewModel
     @ObservedObject var presenter: NotchPresenter
+    @ObservedObject var gamepad: GamepadInput
 
     var body: some View {
         if !vm.isROMLoaded {
@@ -90,6 +101,11 @@ private struct NotchHeaderTrailing: View {
             .buttonStyle(.plain)
         } else if vm.isRunning {
             HStack(spacing: 6) {
+                if gamepad.isConnected {
+                    Image(systemName: "gamecontroller")
+                        .font(.system(size: 10))
+                        .foregroundStyle(NotchPalette.primaryText.opacity(0.55))
+                }
                 Circle()
                     .fill(NotchPalette.running)
                     .frame(width: 6, height: 6)
@@ -111,5 +127,21 @@ private struct NotchHeaderTrailing: View {
 
     private func openSettings() {
         presenter.showsSettings = true
+    }
+}
+
+/// Ícone de controle com texto mono, no mesmo tom do FPS.
+struct GamepadBadge: View {
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "gamecontroller")
+                .font(.system(size: 10))
+                .foregroundStyle(NotchPalette.accentSoft)
+            Text(text)
+                .font(.system(size: 10.5, design: .monospaced))
+                .foregroundStyle(NotchPalette.primaryText.opacity(0.86))
+        }
     }
 }

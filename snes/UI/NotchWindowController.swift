@@ -20,6 +20,8 @@ final class NotchWindowController {
     private let settings = NotchSettings.shared
     private let presenter: NotchPresenter
     private let bindings = KeyBindings.shared
+    private let padBindings = GamepadBindings.shared
+    private let gamepad = GamepadInput()
 
     private var hoverMonitor: NotchHoverMonitor?
     private var keyMonitor: Any?
@@ -59,6 +61,8 @@ final class NotchWindowController {
             presenter: presenter,
             settings: settings,
             bindings: bindings,
+            padBindings: padBindings,
+            gamepad: gamepad,
             recents: RecentROMs.shared,
             panelWidth: width,
             headerHeight: header,
@@ -111,6 +115,7 @@ final class NotchWindowController {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
 
         presenter.hasROM = viewModel.isROMLoaded
+        presenter.hasGamepad = gamepad.isConnected
         presenter.isAppActive = NSApp.isActive
 
         observeState()
@@ -119,6 +124,7 @@ final class NotchWindowController {
         installKeyMonitor()
         installClickMonitor()
         installHotKey()
+        observeGamepad()
     }
 
     func show() {
@@ -231,6 +237,10 @@ final class NotchWindowController {
             presenter.objectWillChange.map { _ in () }.eraseToAnyPublisher(),
             settings.objectWillChange.map { _ in () }.eraseToAnyPublisher(),
             bindings.objectWillChange.map { _ in () }.eraseToAnyPublisher(),
+            padBindings.objectWillChange.map { _ in () }.eraseToAnyPublisher(),
+            gamepad.$controller.map { _ in () }.eraseToAnyPublisher(),
+            gamepad.$batteryLevel.map { _ in () }.eraseToAnyPublisher(),
+            gamepad.$justConnected.map { _ in () }.eraseToAnyPublisher(),
             RecentROMs.shared.objectWillChange.map { _ in () }.eraseToAnyPublisher()
         )
         // `objectWillChange` dispara antes da mutação: adia um ciclo para ler o
@@ -311,7 +321,43 @@ final class NotchWindowController {
     private func releaseJoypad() {
         guard pressedButtons != 0 else { return }
         pressedButtons = 0
-        viewModel.setJoypad(0)
+        pushJoypad()
+    }
+
+    /// Teclado e controle somam: soltar um não apaga o outro.
+    private func pushJoypad() {
+        viewModel.setJoypad(pressedButtons | gamepad.pressed)
+    }
+
+    private func observeGamepad() {
+        // Direto no evento, sem passar por Combine/SwiftUI: latência mínima.
+        gamepad.onPressedChange = { [weak self] _ in
+            guard let self, presenter.rebindingPadButton == nil, !presenter.showsSettings else { return }
+            pushJoypad()
+        }
+        gamepad.$controller
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] controller in
+                guard let self else { return }
+                presenter.hasGamepad = controller != nil
+                if controller == nil { presenter.rebindingPadButton = nil }
+            }
+            .store(in: &cancellables)
+        presenter.$rebindingPadButton
+            .sink { [weak self] button in
+                // Só captura enquanto há algo a regravar; fora disso o handler é nil e o jogo recebe o controle.
+                guard let self else { return }
+                if button == nil { gamepad.onCapture = nil } else { installCapture() }
+            }
+            .store(in: &cancellables)
+    }
+
+    private func installCapture() {
+        gamepad.onCapture = { [weak self] element in
+            guard let self, let button = presenter.rebindingPadButton else { return }
+            padBindings.bind(button, to: element)
+            presenter.rebindingPadButton = nil
+        }
     }
 
     // MARK: - Monitores
@@ -357,7 +403,9 @@ final class NotchWindowController {
         }
 
         if event.type == .keyDown && event.keyCode == UInt16(kVK_Escape) {
-            if presenter.showsSettings {
+            if presenter.rebindingPadButton != nil {
+                presenter.rebindingPadButton = nil
+            } else if presenter.showsSettings {
                 presenter.showsSettings = false
             } else if presenter.isPinned {
                 presenter.isPinned = false
@@ -373,7 +421,7 @@ final class NotchWindowController {
         } else {
             pressedButtons &= ~button.mask
         }
-        viewModel.setJoypad(pressedButtons)
+        pushJoypad()
         return nil
     }
 
