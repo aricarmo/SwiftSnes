@@ -431,7 +431,10 @@ final class MemoryBus {
         autoJoypadBusy = true
         for i in 0..<4 {
             joypadLatched[i] = joypadState[i]
-            joypadShift[i] = 0
+            // O auto-read já clockou os 16 bits do controle: leituras seriais em
+            // $4016/$4017 depois disso devolvem 1 (controle presente). Jogos da
+            // Rare (DKC) usam isso para detectar o controle e zeram o pad se vier 0.
+            joypadShift[i] = 16
         }
         autoJoypadBusy = false
     }
