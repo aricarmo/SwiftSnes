@@ -103,11 +103,14 @@
     nav ul li:not(:last-child) { display:none; }
     .hero .wrap { padding-top:48px; padding-bottom:40px; gap:18px; }
     .hero .actions { flex-direction:column; width:100%; } .hero .actions .btn { width:100%; }
-    .screen { height:180px; }
-    .panel { width:260px !important; height:160px !important; animation:none; padding:0 12px 10px; }
-    .panel .head, .panel .game { width:236px; animation:none; opacity:1; }
-    .panel .game { font-size:9px; }
-    .cursor, .tags { display:none; }
+    .screen { height:190px; }
+    .panel { padding:0 12px 10px; border-radius:0 0 14px 14px; animation-name:notch-panel-m; }
+    .panel .head { height:24px; width:236px; font-size:9px; }
+    .panel .game { width:236px; border-radius:7px; }
+    .cursor { margin-left:-30px; animation-name:notch-cursor-m; }
+    .tags { gap:16px; font-size:10px; }
+    @keyframes notch-panel-m { 0%,25%{width:120px;height:24px} 30%,55%{width:260px;height:24px} 60%,92%{width:260px;height:170px} 100%{width:120px;height:24px} }
+    @keyframes notch-cursor-m { 0%,22%{transform:translate(90px,60px);opacity:1} 30%,55%{transform:translate(20px,8px);opacity:1} 57%{transform:translate(20px,8px) scale(.85)} 60%,88%{transform:translate(20px,8px) scale(1);opacity:1} 92%,100%{transform:translate(90px,60px);opacity:0} }
     section .wrap { padding-top:40px; padding-bottom:40px; }
     .steps, .cards, .controls .wrap, .keys { grid-template-columns:1fr; gap:24px; }
     .keys { gap:0; } .keys .note { grid-column:auto; }
