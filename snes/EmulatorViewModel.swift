@@ -52,7 +52,7 @@ final class EmulatorViewModel: ObservableObject {
     }
 
     /// Extensões aceitas no painel de abrir e no drop.
-    static let romTypes: [UTType] = ["sfc", "smc", "fig", "swc"].compactMap { UTType(filenameExtension: $0) }
+    static let romTypes: [UTType] = ["sfc", "smc", "fig", "swc"].compactMap { UTType(filenameExtension: $0) } + [.zip]
 
     /// NTSC: 21.477272 MHz / (1364 × 262) ≈ 60,0988 Hz.
     private static let frameDuration: TimeInterval = 1364.0 * 262.0 / 21_477_272.0
@@ -114,14 +114,21 @@ final class EmulatorViewModel: ObservableObject {
         suspendEmulation()
 
         do {
-            let romData = try Data(contentsOf: url)
+            let fileData = try Data(contentsOf: url)
+            var romData = fileData
+            var fallbackName = url.deletingPathExtension().lastPathComponent
+            if ROMArchive.isZip(url) {
+                let entry = try ROMArchive.extractROM(from: fileData)
+                romData = entry.data
+                fallbackName = (entry.name as NSString).deletingPathExtension
+            }
             try snes.loadROM(data: romData, firmwareDirectory: url.deletingLastPathComponent())
             if let sram = sramStore.load(romHash: snes.cartridgeHash) {
                 snes.restoreSRAM(sram)
             }
 
             let cartTitle = snes.cartridgeTitle.trimmingCharacters(in: .whitespaces)
-            romTitle = cartTitle.isEmpty ? url.deletingPathExtension().lastPathComponent : cartTitle
+            romTitle = cartTitle.isEmpty ? fallbackName : cartTitle
             errorText = nil
             isROMLoaded = true
             poweredOn = false
