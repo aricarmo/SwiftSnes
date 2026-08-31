@@ -12,6 +12,11 @@ struct GameBody: View {
     let videoSize: CGSize
     let filter: ScreenFilter
 
+    @ObservedObject private var settings = NotchSettings.shared
+    /// OSD de volume visível por cima do jogo; some sozinho.
+    @State private var osdVisible = false
+    @State private var osdHide: DispatchWorkItem?
+
     var body: some View {
         VStack(spacing: 8) {
             ScreenView(source: vm.frameSource, filter: filter)
@@ -35,7 +40,16 @@ struct GameBody: View {
                             .transition(.opacity)
                     }
                 }
+                .overlay(alignment: .bottomLeading) {
+                    if osdVisible {
+                        VolumeOSD(volume: settings.volume, muted: settings.muted)
+                            .padding(16)
+                            .transition(.opacity)
+                    }
+                }
                 .animation(.easeInOut(duration: 0.2), value: vm.resumeNotice)
+                .onChange(of: settings.volume) { _, _ in showVolumeOSD() }
+                .onChange(of: settings.muted) { _, _ in showVolumeOSD() }
 
             if let session = vm.rewind {
                 RewindStrip(session: session, width: videoSize.width,
@@ -47,6 +61,81 @@ struct GameBody: View {
         .padding(.horizontal, NotchMetrics.contentPadding)
         .padding(.top, 6)
         .padding(.bottom, NotchMetrics.contentPadding)
+    }
+
+    private func showVolumeOSD() {
+        withAnimation(.easeOut(duration: 0.12)) { osdVisible = true }
+        osdHide?.cancel()
+        let work = DispatchWorkItem {
+            withAnimation(.easeIn(duration: 0.3)) { osdVisible = false }
+        }
+        osdHide = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6, execute: work)
+    }
+}
+
+// MARK: - Volume
+
+/// OSD por cima do jogo no estilo de TVs antigas: "VOLUME" verde e blocos.
+private struct VolumeOSD: View {
+    let volume: Double
+    let muted: Bool
+
+    private static let blocks = 15
+    private static let green = Color(red: 0.208, green: 1.0, blue: 0.427) // #35ff6d
+
+    private var filled: Int {
+        muted ? 0 : min(Self.blocks, Int((volume * Double(Self.blocks)).rounded()))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(muted ? "MUDO" : "VOLUME")
+                .font(.system(size: 11, weight: .heavy, design: .monospaced))
+                .kerning(2)
+                .foregroundStyle(Self.green)
+                .shadow(color: .black.opacity(0.85), radius: 0, x: 2, y: 2)
+            HStack(spacing: 3) {
+                ForEach(0..<Self.blocks, id: \.self) { i in
+                    Rectangle()
+                        .fill(i < filled ? Self.green : Self.green.opacity(0.22))
+                        .frame(width: 5, height: 18)
+                        .shadow(color: .black.opacity(0.85), radius: 0, x: 1.5, y: 1.5)
+                }
+            }
+        }
+    }
+}
+
+/// Alto-falante que silencia no clique + slider de volume ao lado.
+private struct VolumeControl: View {
+    @ObservedObject var settings: NotchSettings
+
+    private var symbol: String {
+        if settings.muted { return "speaker.slash.fill" }
+        switch settings.volume {
+        case ..<0.05: return "speaker.fill"
+        case ..<0.4: return "speaker.wave.1.fill"
+        case ..<0.75: return "speaker.wave.2.fill"
+        default: return "speaker.wave.3.fill"
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 4) {
+            IconButton(symbol: symbol, active: settings.muted,
+                       action: { settings.muted.toggle() })
+            Slider(value: Binding(
+                get: { settings.muted ? 0 : settings.volume },
+                set: { newValue in
+                    settings.volume = newValue
+                    if settings.muted, newValue > 0 { settings.muted = false }
+                }
+            ), in: 0...1)
+            .controlSize(.mini)
+            .tint(NotchPalette.accent)
+            .frame(width: 72)
+        }
     }
 }
 
@@ -261,6 +350,7 @@ private struct ControlsBar: View {
             IconButton(symbol: "arrow.counterclockwise", action: vm.reset)
             IconButton(symbol: "backward.fill", active: vm.rewind != nil, action: vm.toggleRewind)
             IconButton(symbol: "folder", action: vm.showFileDialog)
+            VolumeControl(settings: NotchSettings.shared)
 
             Spacer(minLength: 0)
 

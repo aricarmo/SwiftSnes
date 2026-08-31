@@ -110,6 +110,12 @@ final class SNES {
         reportedTruncatedFrame = false
     }
 
+    /// Volume da saída de áudio (0…1), aplicado no callback realtime.
+    var audioVolume: Float {
+        get { apu.audioOutput.volume }
+        set { apu.audioOutput.volume = newValue }
+    }
+
     func powerOn() {
         reset()
         isRunning = true

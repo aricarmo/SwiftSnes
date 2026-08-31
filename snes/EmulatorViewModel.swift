@@ -68,6 +68,7 @@ final class EmulatorViewModel: ObservableObject {
     private var fpsTimer: Timer?
     private var frameCount = 0
     private var lastFPSUpdate = Date()
+    private var cancellables = Set<AnyCancellable>()
 
     /// A ROM já foi ligada uma vez: retomar não pode resetar o console.
     private var poweredOn = false
@@ -78,6 +79,15 @@ final class EmulatorViewModel: ObservableObject {
 
     init() {
         startFPSTimer()
+
+        // Volume/mute valem na hora, inclusive com o jogo rodando.
+        let settings = NotchSettings.shared
+        settings.$volume.combineLatest(settings.$muted)
+            .sink { [weak self] volume, muted in
+                self?.snes.audioVolume = muted ? 0 : Float(volume)
+            }
+            .store(in: &cancellables)
+
         if let path = ProcessInfo.processInfo.environment["SNES_ROM"] {
             loadROM(from: URL(fileURLWithPath: path))
         }

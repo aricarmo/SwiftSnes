@@ -53,6 +53,8 @@ final class NotchSettings: ObservableObject {
         static let screenFilter = "notch.screenFilter"
         static let retroStyle = "notch.retroStyle"
         static let analogAsDpad = "notch.analogAsDpad"
+        static let volume = "notch.volume"
+        static let muted = "notch.muted"
     }
 
     /// Recolher o painel suspende CPU/PPU/APU.
@@ -86,6 +88,18 @@ final class NotchSettings: ObservableObject {
         }
     }
 
+    /// Volume do jogo (0…1), independente do volume do sistema.
+    @Published var volume: Double {
+        didSet { defaults.set(volume, forKey: Key.volume) }
+    }
+    /// Silencia o jogo sem perder o nível do slider.
+    @Published var muted: Bool {
+        didSet { defaults.set(muted, forKey: Key.muted) }
+    }
+
+    /// Volume que a saída de áudio deve aplicar de fato.
+    var effectiveVolume: Float { muted ? 0 : Float(volume) }
+
     /// "Efeito TV antiga": desligado é tela limpa; ligado volta ao último estilo.
     var retroEffectEnabled: Bool {
         get { screenFilter != .clean }
@@ -104,7 +118,9 @@ final class NotchSettings: ObservableObject {
             Key.pauseOnHide: true,
             Key.audioFade: true,
             Key.clickToOpen: false,
-            Key.analogAsDpad: true
+            Key.analogAsDpad: true,
+            Key.volume: 1.0,
+            Key.muted: false
         ])
         pauseOnHide = defaults.bool(forKey: Key.pauseOnHide)
         audioFade = defaults.bool(forKey: Key.audioFade)
@@ -112,6 +128,8 @@ final class NotchSettings: ObservableObject {
         analogAsDpad = defaults.bool(forKey: Key.analogAsDpad)
         screenSize = ScreenSize(rawValue: defaults.string(forKey: Key.screenSize) ?? "") ?? .compact
         screenFilter = ScreenFilter(rawValue: defaults.string(forKey: Key.screenFilter) ?? "") ?? .clean
+        volume = defaults.double(forKey: Key.volume)
+        muted = defaults.bool(forKey: Key.muted)
     }
 
     var fadeDuration: TimeInterval { audioFade ? 0.15 : 0 }

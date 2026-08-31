@@ -26,6 +26,14 @@ final class AudioOutput {
     private let underrunCount = Atomic<UInt64>(0)  // consumidor
     private let overrunCount = Atomic<UInt64>(0)   // produtor
 
+    /// Volume do usuário (0…1) como bit pattern, lido pelo thread realtime.
+    private let volumeBits = Atomic<UInt32>(Float(1).bitPattern)
+
+    var volume: Float {
+        get { Float(bitPattern: volumeBits.load(ordering: .relaxed)) }
+        set { volumeBits.store(min(max(newValue, 0), 1).bitPattern, ordering: .relaxed) }
+    }
+
     // Estado exclusivo do thread de áudio
     private var lastSampleL: Float = 0
     private var lastSampleR: Float = 0
@@ -204,13 +212,17 @@ final class AudioOutput {
             primed = true
         }
 
+        // Volume do usuário: lido uma vez por callback, aplicado na saída.
+        // `lastSample*` fica pré-volume para o decay acompanhar mudanças.
+        let vol = Float(bitPattern: volumeBits.load(ordering: .relaxed))
+
         let toRead = min(frames, available)
         for f in 0..<toRead {
             let l = Float(bufferL[rp]) / 32768.0
             let r = Float(bufferR[rp]) / 32768.0
             lastSampleL = l
             lastSampleR = r
-            put(f, l, r)
+            put(f, l * vol, r * vol)
             rp = (rp &+ 1) & Self.mask
         }
         readPos.store(rp, ordering: .releasing)
@@ -222,7 +234,7 @@ final class AudioOutput {
         for f in toRead..<frames {
             lastSampleL *= decayFactor
             lastSampleR *= decayFactor
-            put(f, lastSampleL, lastSampleR)
+            put(f, lastSampleL * vol, lastSampleR * vol)
         }
     }
 }
