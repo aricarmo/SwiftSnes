@@ -718,8 +718,8 @@ final class PPU {
                 inVBlank = true
                 nmiFlag = true
                 // No início do vblank (fora do forced blank) o hardware recarrega
-                // o endereço interno da OAM a partir de $2102/$2103. Jogos como
-                // DKC fazem DMA para $2104 todo frame sem reescrever OAMADD e
+                // o endereço interno da OAM a partir de $2102/$2103. Muitos jogos
+                // fazem DMA para $2104 todo frame sem reescrever OAMADD e
                 // dependem disso; sem a recarga a OAM fica deslocada.
                 if (registers[0x00] & 0x80) == 0 {
                     reloadOAMAddress()

@@ -1,7 +1,7 @@
 //  RetroShaders.metal
-//  Filtros retro de exibição (scanlines, máscara de fósforo, curvatura),
-//  portados do caminho de display do MetalSNES. Só pós-processamento: o
-//  frame já chega pronto do PPU, aqui ele vira "tela de tubo".
+//  Filtros retro de exibição (scanlines, máscara de fósforo, curvatura).
+//  Só pós-processamento: o frame já chega pronto do PPU, aqui ele vira
+//  "tela de tubo".
 
 #include <metal_stdlib>
 using namespace metal;

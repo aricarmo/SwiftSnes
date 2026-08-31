@@ -92,9 +92,9 @@ final class Cartridge {
         dspPart = CartDSPFirmware.part(forTitle: title)
 
         // SRAM: tamanho = 1 << n KB. Header com 0 = cartucho SEM SRAM, e isso
-        // precisa ser respeitado: o anti-pirataria do Mega Man X escreve na
-        // área de SRAM e, se ler de volta o que escreveu, se sabota (pulos
-        // fracos). Em cartucho real a leitura volta open bus.
+        // precisa ser respeitado: rotinas anti-pirataria escrevem na área de
+        // SRAM e, se lerem de volta o que escreveram, sabotam o gameplay.
+        // Em cartucho real a leitura volta open bus.
         let sramSizeCode = headerByte(best.offset + 0x18)
         let sramSize = sramSizeCode > 0 && sramSizeCode <= 0x0C ? (1 << Int(sramSizeCode)) * 1024 : 0
         sram = [UInt8](repeating: 0, count: sramSize)

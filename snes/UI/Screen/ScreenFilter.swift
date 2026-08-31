@@ -1,6 +1,5 @@
 //  ScreenFilter.swift
-//  Modos de filtro retro da tela e seus presets, espelhando os valores do
-//  MetalSNES para o resultado visual ser o mesmo.
+//  Modos de filtro retro da tela e seus presets.
 
 import simd
 
@@ -52,8 +51,7 @@ struct DisplayUniforms {
 }
 
 extension DisplayUniforms {
-    /// Presets por modo, copiados do `makeDisplayUniforms` do MetalSNES
-    /// (perfil de ajuste padrão: tudo 1.0).
+    /// Presets por modo (perfil de ajuste padrão: tudo 1.0).
     static func preset(for filter: ScreenFilter, drawableSize: SIMD2<Float>) -> DisplayUniforms {
         var u = DisplayUniforms()
         u.viewportSize = drawableSize

@@ -62,7 +62,7 @@ enum CartDSPFirmware {
         return nil
     }
 
-    /// Dumps from ares/retrobios store each program word and table word little-endian.
+    /// Dumps comuns guardam cada palavra do programa e da tabela em little-endian.
     private static func expansions(_ data: Data) -> [Data] {
         var out = [data]
         if data.count > 512 {
@@ -248,8 +248,8 @@ final class CartDSPChip {
     /// catch-all: num jogo HiROM os bancos $20–$3F e $C0–$FF acima de $8000 são
     /// ROM, e reivindicá-los aqui sombreia metade do cartucho.
     ///
-    /// - HiROM (Super Mario Kart): DR em $00–$1F:$6000–$6FFF, SR em $7000–$7FFF
-    /// - LoROM (Pilotwings):       DR em $30–$3F:$8000–$BFFF, SR em $C000–$FFFF
+    /// - HiROM: DR em $00–$1F:$6000–$6FFF, SR em $7000–$7FFF
+    /// - LoROM: DR em $30–$3F:$8000–$BFFF, SR em $C000–$FFFF
     ///
     /// Retorna nil fora da janela, true para o registrador de status.
     static func port(bank: UInt32, offset: UInt32, mapper: Cartridge.Mapper) -> Bool? {

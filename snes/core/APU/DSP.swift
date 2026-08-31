@@ -12,7 +12,7 @@ protocol DSPInterface: AnyObject {
 /// S-DSP emulation for the SNES APU.
 /// 128 registers, 8 voices, BRR sample decoding, ADSR/GAIN envelopes.
 /// Generates 32 kHz stereo audio.
-/// Replicate bsnes CLAMP16 macro: clamp Int to [-32768, 32767].
+/// Clamp de 16 bits do S-DSP: limita Int a [-32768, 32767].
 @inline(__always)
 private func CLAMP16(_ v: inout Int) {
     if Int16(truncatingIfNeeded: v) != v {
@@ -57,7 +57,7 @@ final class DSP: DSPInterface {
     /// Global sample counter (incremented each generateSample call)
     var sampleCounter: UInt32 = 0
 
-    // MARK: Global counter system (matches bsnes)
+    // MARK: Global counter system
 
     /// Global counter cycles 0..30719 (simple_counter_range = 2048 * 5 * 3 = 30720)
     private static let simpleCounterRange = 30720
@@ -79,7 +79,7 @@ final class DSP: DSPInterface {
                  1
     ]
 
-    /// Offset for each rate 0-31 (bsnes counter_offsets).
+    /// Offset for each rate 0-31.
     private static let counterOffsets: [Int] = [
           1, 0, 1040,
         536, 0, 1040,
@@ -253,7 +253,7 @@ final class DSP: DSPInterface {
         processKeyOnOff()
         runCounters()
 
-        // --- Noise LFSR update (uses global counter, matching bsnes) ---
+        // --- Noise LFSR update (uses global counter) ---
         let noiseRate = Int(regs[0x6C] & 0x1F)
         if readCounter(rate: noiseRate) {
             let feedback = (Int(noiseLevel) << 13) ^ (Int(noiseLevel) << 14)
@@ -531,7 +531,7 @@ final class DSP: DSPInterface {
 
             // Hardware clip: clamp to 16-bit, then double-and-wrap to int16,
             // then halve back. This replicates the S-DSP's 15-bit overflow
-            // wrapping (bsnes: CLAMP16(s); s = (int16_t)(s * 2); stored.)
+            // wrapping (CLAMP16(s); s = (int16_t)(s * 2); stored.)
             // When |sample| > 16383 the ×2 overflows int16, wrapping the
             // value — this IS the hardware behavior and affects filter state.
             sample = max(-32768, min(32767, sample))
@@ -591,7 +591,7 @@ final class DSP: DSPInterface {
     }
 
     // MARK: - Envelope (ADSR / GAIN)
-    // Matches bsnes run_envelope() — compute-then-gate pattern with global counter.
+    // Compute-then-gate pattern with global counter, como no hardware.
 
     private func updateEnvelope(voice v: Int) {
         let voff = v * 0x10
@@ -606,13 +606,13 @@ final class DSP: DSPInterface {
             return
         }
 
-        let adsr0 = regs[voff + 5]  // bsnes: adsr0 = register offset 0x05
+        let adsr0 = regs[voff + 5]  // adsr0 = register offset 0x05
         let rate: Int
         var envData: Int
 
         if (adsr0 & 0x80) != 0 {
             // ADSR mode
-            envData = Int(regs[voff + 6])  // bsnes: adsr1 = register offset 0x06
+            envData = Int(regs[voff + 6])  // adsr1 = register offset 0x06
             if voices[v].envMode == .decay || voices[v].envMode == .sustain {
                 // Exponential decrease: env--; env -= env >> 8;
                 env -= 1
@@ -630,7 +630,7 @@ final class DSP: DSPInterface {
                 env += ar < 31 ? 0x20 : 0x400
             }
         } else {
-            // GAIN mode — env_data reassigned to gain register (matches bsnes line 266)
+            // GAIN mode — env_data reassigned to gain register
             let gainReg = regs[voff + 7]
             envData = Int(gainReg)
             let mode = envData >> 5
@@ -659,7 +659,7 @@ final class DSP: DSPInterface {
         }
 
         // Sustain level check (only during decay)
-        // bsnes: if ((env >> 8) == (env_data >> 5) && v->env_mode == env_decay)
+        // if ((env >> 8) == (env_data >> 5) && env_mode == decay)
         if (env >> 8) == (envData >> 5) && voices[v].envMode == .decay {
             voices[v].envMode = .sustain
         }

@@ -1233,13 +1233,13 @@ final class SPC700 {
         case 0x0E: // TSET1 !abs
             let addr = fetchWord()
             let v = read(addr)
-            setNZ(a &- v)  // flags based on A - val (confirmed by bsnes reference)
+            setNZ(a &- v)  // flags based on A - val
             write(addr, value: v | a)
             return 6
         case 0x4E: // TCLR1 !abs
             let addr = fetchWord()
             let v = read(addr)
-            setNZ(a &- v)  // flags based on A - val (confirmed by bsnes reference)
+            setNZ(a &- v)  // flags based on A - val
             write(addr, value: v & ~a)
             return 6
 
