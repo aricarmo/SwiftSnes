@@ -276,6 +276,7 @@ final class NotchWindowController {
             bindings.objectWillChange.map { _ in () }.eraseToAnyPublisher(),
             padBindings.objectWillChange.map { _ in () }.eraseToAnyPublisher(),
             gamepad.$controller.map { _ in () }.eraseToAnyPublisher(),
+            gamepad.$hidName.map { _ in () }.eraseToAnyPublisher(),
             gamepad.$batteryLevel.map { _ in () }.eraseToAnyPublisher(),
             gamepad.$justConnected.map { _ in () }.eraseToAnyPublisher(),
             RecentROMs.shared.objectWillChange.map { _ in () }.eraseToAnyPublisher(),
@@ -456,12 +457,13 @@ final class NotchWindowController {
                   presenter.isOpen else { return }
             viewModel.toggleRewind()
         }
-        gamepad.$controller
+        Publishers.Merge(gamepad.$controller.map { _ in () },
+                         gamepad.$hidName.map { _ in () })
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] controller in
+            .sink { [weak self] in
                 guard let self else { return }
-                presenter.hasGamepad = controller != nil
-                if controller == nil { presenter.rebindingPadButton = nil }
+                presenter.hasGamepad = gamepad.isConnected
+                if !gamepad.isConnected { presenter.rebindingPadButton = nil }
             }
             .store(in: &cancellables)
         presenter.$rebindingPadButton

@@ -12,10 +12,25 @@ enum GamepadElement: String, CaseIterable, Codable {
     case leftShoulder, rightShoulder, leftTrigger, rightTrigger
     case menu, options, home
     case leftThumbstickButton, rightThumbstickButton
+    // Botões numerados de controles HID genéricos (clones USB), que o
+    // GameController.framework não reconhece e chegam via HIDGamepad.
+    case hid1, hid2, hid3, hid4, hid5, hid6, hid7, hid8
+    case hid9, hid10, hid11, hid12, hid13, hid14, hid15, hid16
+
+    /// Índice 1-based do botão HID, nil para elementos do perfil estendido.
+    var hidIndex: Int? {
+        guard rawValue.hasPrefix("hid") else { return nil }
+        return Int(rawValue.dropFirst(3))
+    }
+
+    static func hid(_ index: Int) -> GamepadElement? {
+        GamepadElement(rawValue: "hid\(index)")
+    }
 
     /// Rótulo curto em layout Xbox / PlayStation, para quando o controle não
     /// informa o nome do próprio botão.
     var genericLabel: String {
+        if let index = hidIndex { return "Botão \(index)" }
         switch self {
         case .buttonA: return "A / ✕"
         case .buttonB: return "B / ○"
@@ -30,6 +45,7 @@ enum GamepadElement: String, CaseIterable, Codable {
         case .home: return "Home"
         case .leftThumbstickButton: return "L3"
         case .rightThumbstickButton: return "R3"
+        default: return rawValue
         }
     }
 
@@ -48,6 +64,7 @@ enum GamepadElement: String, CaseIterable, Codable {
         case .home: return pad.buttonHome
         case .leftThumbstickButton: return pad.leftThumbstickButton
         case .rightThumbstickButton: return pad.rightThumbstickButton
+        default: return nil
         }
     }
 
@@ -78,6 +95,29 @@ final class GamepadBindings: ObservableObject {
         // O SNES não tem L2: o gatilho nunca colide com um jogo.
         "rewind": .leftTrigger
     ]
+
+    /// Layout de fábrica para clones HID genéricos (pads USB estilo SNES):
+    /// a ordem 1=X, 2=A, 3=B, 4=Y é a mais comum nesses controles.
+    private static let factoryHID: [String: GamepadElement] = [
+        "x": .hid1, "a": .hid2, "b": .hid3, "y": .hid4,
+        "l": .hid5, "r": .hid6,
+        "select": .hid9, "start": .hid10
+    ]
+
+    /// Enquanto o único controle é HID genérico e o usuário nunca personalizou
+    /// nada, o layout de fábrica exibido/usado é o de clone, não o estendido.
+    var hidLayoutPreferred = false {
+        didSet {
+            guard oldValue != hidLayoutPreferred, storedPairs() == nil else { return }
+            rebuild(from: hidLayoutPreferred ? Self.factoryHID : Self.factory)
+        }
+    }
+
+    private func storedPairs() -> [String: GamepadElement]? {
+        let stored = (defaults.dictionary(forKey: defaultsKey) as? [String: String])?
+            .compactMapValues { GamepadElement(rawValue: $0) }
+        return stored?.isEmpty == false ? stored : nil
+    }
 
     private init() {
         let stored = (defaults.dictionary(forKey: defaultsKey) as? [String: String])?
@@ -113,7 +153,7 @@ final class GamepadBindings: ObservableObject {
     }
 
     func restoreDefaults() {
-        rebuild(from: GamepadBindings.factory)
+        rebuild(from: hidLayoutPreferred ? GamepadBindings.factoryHID : GamepadBindings.factory)
         defaults.removeObject(forKey: defaultsKey)
     }
 }
@@ -123,6 +163,9 @@ final class GamepadBindings: ObservableObject {
 final class GamepadInput: ObservableObject {
     /// Controle em uso (o primeiro com perfil estendido).
     @Published private(set) var controller: GCController?
+    /// Nome do controle HID genérico conectado (clones USB fora do
+    /// GameController.framework), nil se não há um.
+    @Published private(set) var hidName: String?
     /// Máscara no formato de $4218. Não é @Published de propósito: cada evento
     /// do controle redesenharia o painel inteiro e re-mediria o layout, o que
     /// atrasava a entrada. Quem precisa dela na hora recebe por `onPressedChange`.
@@ -142,11 +185,17 @@ final class GamepadInput: ObservableObject {
 
     private let bindings: GamepadBindings
     private let settings: NotchSettings
+    private let hid = HIDGamepad()
     private var observers: [Any] = []
     private var badgeWork: DispatchWorkItem?
+    /// Máscaras parciais por fonte; `pressed` é o OR das duas.
+    private var gcMask: UInt16 = 0
+    private var hidMask: UInt16 = 0
+    private var gcRewind = false
+    private var hidRewind = false
 
-    var isConnected: Bool { controller != nil }
-    var name: String { controller?.vendorName ?? "Controle" }
+    var isConnected: Bool { controller != nil || hidName != nil }
+    var name: String { controller?.vendorName ?? hidName ?? "Controle" }
 
     static let stickDeadzone: Float = 0.5
     static let badgeDuration: TimeInterval = 2.0
@@ -167,6 +216,27 @@ final class GamepadInput: ObservableObject {
         })
         attach(GCController.controllers().first { $0.extendedGamepad != nil }, announce: false)
         GCController.startWirelessControllerDiscovery()
+
+        hid.onConnect = { [weak self] in
+            guard let self else { return }
+            hidName = hid.name ?? "Controle USB"
+            bindings.hidLayoutPreferred = controller == nil
+            flashBadge()
+        }
+        hid.onDisconnect = { [weak self] in
+            guard let self else { return }
+            hidName = nil
+            bindings.hidLayoutPreferred = false
+            hidMask = 0
+            hidRewind = false
+            publish()
+        }
+        hid.onChange = { [weak self] in self?.handleHIDChange() }
+        hid.onButtonDown = { [weak self] index in
+            guard let self, controller == nil, let onCapture,
+                  let element = GamepadElement.hid(index) else { return }
+            onCapture(element)
+        }
     }
 
     deinit {
@@ -176,6 +246,9 @@ final class GamepadInput: ObservableObject {
     private func attach(_ candidate: GCController?, announce: Bool) {
         guard controller == nil, let candidate, let pad = candidate.extendedGamepad else { return }
         controller = candidate
+        bindings.hidLayoutPreferred = false
+        hidMask = 0
+        hidRewind = false
         batteryLevel = candidate.battery?.batteryLevel
         pad.valueChangedHandler = { [weak self] pad, element in
             MainActor.assumeIsolated { self?.handle(pad: pad, changed: element) }
@@ -188,10 +261,15 @@ final class GamepadInput: ObservableObject {
         controller?.extendedGamepad?.valueChangedHandler = nil
         controller = nil
         batteryLevel = nil
-        pressed = 0
-        rewindHeld = false
+        gcMask = 0
+        gcRewind = false
+        publish()
         // Outro controle ainda ligado assume.
         attach(GCController.controllers().first { $0.extendedGamepad != nil }, announce: false)
+        if controller == nil {
+            bindings.hidLayoutPreferred = hidName != nil
+            handleHIDChange()
+        }
     }
 
     private func flashBadge() {
@@ -222,14 +300,40 @@ final class GamepadInput: ObservableObject {
             mask |= button.mask
             if button == .rewind { rewindNow = true }
         }
-        if rewindNow != rewindHeld {
-            rewindHeld = rewindNow
-            if rewindNow { onRewindPressed?() }
-        }
         mask |= Self.directionMask(pad.dpad)
         if settings.analogAsDpad {
             mask |= Self.directionMask(pad.leftThumbstick)
         }
+        gcMask = mask
+        gcRewind = rewindNow
+        publish()
+    }
+
+    private func handleHIDChange() {
+        // Com um GCController conectado o HID cala: controles "de marca" também
+        // aparecem no IOHIDManager e o input duplicaria.
+        guard controller == nil else { return }
+        if onCapture != nil { return }
+        var mask: UInt16 = 0
+        var rewindNow = false
+        for (element, button) in bindings.map {
+            guard let index = element.hidIndex, hid.buttonsDown.contains(index) else { continue }
+            mask |= button.mask
+            if button == .rewind { rewindNow = true }
+        }
+        mask |= hid.directionMask
+        hidMask = mask
+        hidRewind = rewindNow
+        publish()
+    }
+
+    private func publish() {
+        let rewindNow = gcRewind || hidRewind
+        if rewindNow != rewindHeld {
+            rewindHeld = rewindNow
+            if rewindNow { onRewindPressed?() }
+        }
+        let mask = gcMask | hidMask
         if mask != pressed {
             pressed = mask
             onPressedChange?(mask)
