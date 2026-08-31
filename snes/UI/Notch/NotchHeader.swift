@@ -66,12 +66,16 @@ private struct NotchHeaderLeading: View {
             .buttonStyle(.plain)
         } else {
             HStack(spacing: 7) {
-                Image("CartridgeGlyph")
-                    .renderingMode(.template)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 13, height: 13)
-                    .foregroundStyle(vm.isROMLoaded ? NotchPalette.accentSoft : Color.white.opacity(0.4))
+                if vm.isROMLoaded {
+                    SpinningAppIcon()
+                } else {
+                    Image("CartridgeGlyph")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 13, height: 13)
+                        .foregroundStyle(Color.white.opacity(0.4))
+                }
                 Text(vm.isROMLoaded ? vm.shortTitle : "SNES")
                     .font(.system(size: 10.5))
                     .kerning(0.6)
@@ -135,6 +139,37 @@ private struct NotchHeaderTrailing: View {
 
     private func openSettings() {
         presenter.showsSettings = true
+    }
+}
+
+/// Ícone do app ao lado do nome do jogo: de tempos em tempos dá umas voltas
+/// rápidas e para, só pelo charme.
+private struct SpinningAppIcon: View {
+    @State private var angle: Angle = .zero
+
+    /// Intervalo entre um giro e o próximo.
+    static let restInterval: TimeInterval = 5
+    /// Duração do giro completo (as 3 voltas).
+    static let spinDuration: TimeInterval = 0.8
+    static let turns: Double = 3
+
+    var body: some View {
+        Image("ButtonsGlyph")
+            .resizable()
+            .scaledToFit()
+            .frame(width: 15, height: 15)
+            .rotationEffect(angle)
+            .onAppear(perform: spin)
+            .onReceive(Timer.publish(every: Self.restInterval + Self.spinDuration,
+                                     on: .main, in: .common).autoconnect()) { _ in
+                spin()
+            }
+    }
+
+    private func spin() {
+        withAnimation(.easeInOut(duration: Self.spinDuration)) {
+            angle += .degrees(360 * Self.turns)
+        }
     }
 }
 
