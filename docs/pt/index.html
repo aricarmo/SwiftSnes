@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NotchSnes — o Super Nintendo que mora no notch do seu Mac</title>
+<meta name="description" content="Emulador de Super Nintendo para macOS que vive no notch do MacBook. Gratuito e open source.">
+<meta property="og:title" content="NotchSnes">
+<meta property="og:description" content="O Super Nintendo que mora no notch do seu Mac.">
+<meta property="og:image" content="https://aricarmo.github.io/SwiftSnes/icon.png">
+<link rel="icon" href="../favicon.png">
+<link rel="canonical" href="https://aricarmo.github.io/SwiftSnes/pt/">
+<link rel="alternate" hreflang="pt-BR" href="https://aricarmo.github.io/SwiftSnes/pt/">
+<link rel="alternate" hreflang="en" href="https://aricarmo.github.io/SwiftSnes/">
+<link rel="alternate" hreflang="x-default" href="https://aricarmo.github.io/SwiftSnes/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<nav><div class="wrap">
+  <a class="brand mono" href="#"><img src="../icon.png" alt="">NOTCHSNES</a>
+  <ul>
+    <li><a href="#recursos">Recursos</a></li>
+    <li><a href="#controles">Controles</a></li>
+    <li><a href="https://github.com/aricarmo/SwiftSnes">GitHub</a></li>
+    <li><a href="../" lang="en" hreflang="en" class="mono">EN</a></li>
+  </ul>
+</div></nav>
+
+<header class="hero"><div class="wrap">
+  <span class="eyebrow mono">Super Nintendo · macOS 15.4+ · Open source</span>
+  <h1>O Super Nintendo que mora no notch do seu Mac.</h1>
+  <p class="lead">Um painel preto se funde ao entalhe da tela. Passe o cursor para ver o título e o FPS, clique para expandir o jogo, e volte ao trabalho sem fechar nada.</p>
+  <div class="actions">
+    <a class="btn btn-primary" href="https://github.com/aricarmo/SwiftSnes/releases/latest/download/NotchSnes.dmg">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+      Baixar para macOS
+    </a>
+    <a class="btn btn-ghost" href="https://github.com/aricarmo/SwiftSnes">Ver código-fonte</a>
+  </div>
+  <span class="meta mono">.dmg · v1.6 · Apple Silicon e Intel · sandbox ligado</span>
+
+  <div class="demo" aria-hidden="true">
+    <div class="tags mono"><span class="tag-a">1 · RECOLHIDO</span><span class="tag-b">2 · HOVER</span><span class="tag-c">3 · EXPANDIDO</span></div>
+    <div style="width:100%">
+      <div class="lid"></div>
+      <div class="screen">
+        <div class="panel">
+          <div class="head mono">
+            <div><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#b79bff" stroke-width="2.2" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 3v5h8V3"/><path d="M4 15h16"/></svg><span style="color:rgba(245,245,247,.86)">GAME</span></div>
+            <div><span class="dot"></span><span style="color:rgba(245,245,247,.6)">60 FPS</span></div>
+          </div>
+          <div class="game"><img src="../screenshot.png" alt=""><div class="scan"></div></div>
+        </div>
+        <svg class="cursor" width="18" height="22" viewBox="0 0 18 22" fill="none"><path d="M2 2l6 15 2.5-6 6-2.5L2 2z" fill="#fff" stroke="#000" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      </div>
+    </div>
+  </div>
+</div></header>
+
+<section><div class="wrap steps">
+  <div><span class="eyebrow mono">01 — ESPIE</span><h3>Cursor no notch</h3><p>O cabeçalho aparece sozinho: título do jogo, FPS e estado de pausa. Nada de janela extra no Dock ou na barra de menus.</p></div>
+  <div><span class="eyebrow mono">02 — JOGUE</span><h3>Clique para expandir</h3><p>O painel desce com o jogo em tempo real. Arraste uma ROM para dentro ou escolha uma das recentes.</p></div>
+  <div><span class="eyebrow mono">03 — FIXE</span><h3><kbd>⌘⇧P</kbd> mantém o teclado</h3><p>Atalho global captura o teclado para o jogo. Esc solta. Tudo reconfigurável no painel de ajustes.</p></div>
+</div></section>
+
+<section class="features" id="recursos"><div class="wrap">
+  <div class="intro"><span class="eyebrow mono">Por dentro</span><h2>Emulação completa, escrita do zero em Swift.</h2></div>
+  <div class="cards">
+    <div class="card"><span class="mono">CPU 65C816 · PPU modos 0–7</span><p>Sprites, HDMA e todos os modos de vídeo, incluindo o Modo 7.</p></div>
+    <div class="card"><span class="mono">SPC700 + S-DSP</span><p>BRR, ADSR e echo. Áudio a 32 kHz com ring buffer lock-free, sem estalos.</p></div>
+    <div class="card"><span class="mono">LoROM · HiROM · ExHiROM</span><p>Detecção de header por pontuação. Save de SRAM automático.</p></div>
+    <div class="card"><span class="mono">DSP-1 a DSP-4</span><p>Coprocessador NEC µPD77C25 emulado. Super Mario Kart e Pilotwings rodam com o firmware que você fornece.</p></div>
+  </div>
+</div></section>
+
+<section class="controls" id="controles"><div class="wrap">
+  <div class="intro"><span class="eyebrow mono">Controles padrão</span><h2>Mãos no teclado, do jeito que você já conhece.</h2><p class="muted">Todas as teclas são reconfiguráveis no ícone de engrenagem do painel.</p></div>
+  <div class="keys">
+    <div><span>Direcional</span><span class="mono">← ↑ → ↓</span></div>
+    <div><span>B / A</span><span class="mono">Z / X</span></div>
+    <div><span>Y / X</span><span class="mono">A / S</span></div>
+    <div><span>L / R</span><span class="mono">Q / W</span></div>
+    <div><span>Start / Select</span><span class="mono">Return / Espaço</span></div>
+    <div><span>Fixar painel</span><span class="mono">⌘⇧P</span></div>
+    <div class="note"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b79bff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Todos os controles são personalizáveis no painel de ajustes.</span></div>
+  </div>
+</div></section>
+
+<section class="cta"><div class="wrap">
+  <img src="../icon.png" alt="">
+  <h2>Gratuito e open source.</h2>
+  <p>Traga suas próprias ROMs. O NotchSnes não distribui jogos nem firmware de coprocessador.</p>
+  <a class="btn btn-primary" href="https://github.com/aricarmo/SwiftSnes/releases/latest/download/NotchSnes.dmg">Download</a>
+</div></section>
+
+<footer><div class="wrap">
+  <span class="mono">NOTCHSNES · Feito em Swift</span>
+  <span>Super Nintendo é marca da Nintendo. Projeto independente, sem afiliação.</span>
+</div></footer>
+
+</body>
+</html>

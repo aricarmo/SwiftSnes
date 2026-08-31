@@ -1,88 +1,88 @@
 # NotchSnes
 
-[English](README.en.md) · **Português**
-
-Emulador de Super Nintendo escrito em Swift que vive no notch do MacBook.
-O painel se funde ao entalhe da tela: passe o cursor para espiar o título e o
-FPS, clique para expandir o jogo, fixe com `⌘⇧P` para manter o teclado capturado.
+A Super Nintendo emulator written in Swift that lives in the MacBook notch.
+The panel blends into the display cutout: hover to peek at the game title and
+FPS, click to expand the game, pin with `⌘⇧P` to keep the keyboard captured.
 
 ![macOS 15.4+](https://img.shields.io/badge/macOS-15.4%2B-black) ![Swift 5](https://img.shields.io/badge/Swift-5-orange)
 
-## Recursos
+## Features
 
-- CPU 65C816, PPU (modos 0–7, sprites, HDMA), APU (SPC700 + S-DSP com BRR/ADSR/echo)
-- Mappers LoROM, HiROM e ExHiROM com detecção de header por pontuação
-- Coprocessador DSP-1/1B/2/3/4 (NEC µPD77C25) emulado — firmware fornecido pelo usuário
-- Áudio a 32 kHz via `AVAudioSourceNode` com ring buffer lock-free
-- Save de SRAM (`.srm`) automático em `~/Library/Application Support/NotchSnes/saves/`
-- ROMs recentes com bookmarks de sandbox, drag-and-drop, teclas configuráveis
-- App acessório (sem Dock nem barra de menus), sandbox ligado
+- 65C816 CPU, PPU (modes 0–7, sprites, HDMA), APU (SPC700 + S-DSP with BRR/ADSR/echo)
+- LoROM, HiROM and ExHiROM mappers with score-based header detection
+- Emulated DSP-1/1B/2/3/4 coprocessor (NEC µPD77C25) — firmware supplied by the user
+- 32 kHz audio through `AVAudioSourceNode` with a lock-free ring buffer
+- Automatic SRAM saves (`.srm`) in `~/Library/Application Support/NotchSnes/saves/`
+- Recent ROMs with sandbox bookmarks, drag-and-drop, remappable keys
+- Accessory app (no Dock or menu bar presence), sandbox enabled
 
 ## Build
 
-Requer Xcode 26 e macOS 15.4+.
+Requires Xcode 26 and macOS 15.4+.
 
 ```sh
 xcodebuild -project NotchSnes.xcodeproj -scheme NotchSnes -configuration Release build
 ```
 
-Ou abra `NotchSnes.xcodeproj` e rode o scheme `NotchSnes`.
+Or open `NotchSnes.xcodeproj` and run the `NotchSnes` scheme.
 
-Para abrir uma ROM direto no launch (útil em desenvolvimento):
+To open a ROM straight at launch (handy for development):
 
 ```sh
-SNES_ROM=/caminho/jogo.sfc ./NotchSnes.app/Contents/MacOS/NotchSnes
+SNES_ROM=/path/to/game.sfc ./NotchSnes.app/Contents/MacOS/NotchSnes
 ```
 
-## Firmware de coprocessador
+## Coprocessor firmware
 
-Jogos com DSP-1..4 (Super Mario Kart, Pilotwings, Dungeon Master…) precisam do
-dump do chip. **O firmware não é distribuído com o app.** Coloque os arquivos em:
+Games using DSP-1..4 (Super Mario Kart, Pilotwings, Dungeon Master…) need a
+dump of the chip. **The firmware is not distributed with the app.** Put the
+files in:
 
 ```
 ~/Library/Application Support/NotchSnes/bios/
 ```
 
-Formatos aceitos: `dspN.program.rom` + `dspN.data.rom` (estilo ares/higan) ou o
-combinado `SNES_dspN.rom` de 8 KiB (estilo Snes9x/bsnes). Os arquivos são
-identificados por SHA-256, então o nome não importa. As pastas de firmware do
-ares, bsnes, higan e Snes9x também são consultadas. A variável
-`SNES_DSP_FIRMWARE_DIR` (lista separada por `:`) adiciona outros diretórios.
+Accepted formats: `dspN.program.rom` + `dspN.data.rom` (ares/higan style) or
+the combined 8 KiB `SNES_dspN.rom` (Snes9x/bsnes style). Files are identified
+by SHA-256, so the name doesn't matter. The firmware folders of ares, bsnes,
+higan and Snes9x are also searched. The `SNES_DSP_FIRMWARE_DIR` variable
+(`:`-separated list) adds extra directories.
 
-Sem o firmware o jogo carrega, mas o coprocessador responde com valores vazios.
+Without the firmware the game still loads, but the coprocessor answers with
+empty values.
 
-## Controles padrão
+## Default controls
 
-| SNES | Tecla |
+| SNES | Key |
 |---|---|
-| Direcional | Setas |
+| D-pad | Arrow keys |
 | B / A | Z / X |
 | Y / X | A / S |
 | L / R | Q / W |
-| Start / Select | Return / Espaço |
-| Fixar painel | ⌘⇧P (global) |
-| Fechar ajustes / soltar | Esc |
+| Start / Select | Return / Space |
+| Pin panel | ⌘⇧P (global) |
+| Close settings / release | Esc |
 
-Tudo é reconfigurável no painel de ajustes (ícone de engrenagem).
+Everything is remappable in the settings panel (gear icon).
 
-## Organização do código
+## Code layout
 
 ```
 snes/
-├── core/            emulação pura, sem AppKit/SwiftUI
+├── core/            pure emulation, no AppKit/SwiftUI
 │   ├── CPU/         65C816
-│   ├── PPU/         vídeo
-│   ├── APU/         SPC700, S-DSP, saída de áudio
-│   ├── Memory/      barramento, cartucho, DMA/HDMA
+│   ├── PPU/         video
+│   ├── APU/         SPC700, S-DSP, audio output
+│   ├── Memory/      bus, cartridge, DMA/HDMA
 │   └── Coprocessor/ µPD77C25 (DSP-1..4)
-├── UI/              painel do notch (AppKit + SwiftUI)
-│   └── Notch/       seções da view: cabeçalho, jogo, vazio, ajustes
-├── EmulatorViewModel.swift   ciclo de vida da ROM e laço de frames
-└── SRAMStore.swift           persistência de saves
+├── UI/              notch panel (AppKit + SwiftUI)
+│   └── Notch/       view sections: header, game, empty, settings
+├── EmulatorViewModel.swift   ROM lifecycle and frame loop
+└── SRAMStore.swift           save persistence
 ```
 
 Logs: `log stream --predicate 'subsystem == "com.ari.NotchSnes"'`.
 
-## Licença
+## License
 
-A definir.
+To be defined.
