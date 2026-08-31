@@ -1,5 +1,7 @@
 # NotchSnes
 
+[English](README.en.md) · **Português**
+
 Emulador de Super Nintendo escrito em Swift que vive no notch do MacBook.
 O painel se funde ao entalhe da tela: passe o cursor para espiar o título e o
 FPS, clique para expandir o jogo, fixe com `⌘⇧P` para manter o teclado capturado.
