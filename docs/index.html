@@ -9,115 +9,13 @@
 <meta property="og:description" content="O Super Nintendo que mora no notch do seu Mac.">
 <meta property="og:image" content="https://aricarmo.github.io/SwiftSnes/icon.png">
 <link rel="icon" href="favicon.png">
+<link rel="canonical" href="https://aricarmo.github.io/SwiftSnes/">
+<link rel="alternate" hreflang="pt-BR" href="https://aricarmo.github.io/SwiftSnes/">
+<link rel="alternate" hreflang="en" href="https://aricarmo.github.io/SwiftSnes/en/">
+<link rel="alternate" hreflang="x-default" href="https://aricarmo.github.io/SwiftSnes/">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;500&display=swap">
-<style>
-  :root { --bg:#09090b; --fg:#f5f5f7; --accent:#7c5cff; --accent-soft:#b79bff; --running:#4ade80; --line:rgba(255,255,255,0.08); --muted:rgba(245,245,247,0.62); }
-  * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--fg); font-family:'Space Grotesk','Helvetica Neue',Arial,sans-serif; -webkit-font-smoothing:antialiased; }
-  a { color:var(--accent-soft); text-decoration:none; } a:hover { color:#c9b5ff; }
-  .mono { font-family:'JetBrains Mono','SF Mono',Menlo,monospace; letter-spacing:.06em; }
-  .wrap { max-width:1312px; margin:0 auto; padding:0 64px; }
-  h1,h2,h3 { margin:0; font-weight:700; }
-  p { margin:0; }
-  .eyebrow { font-size:12px; color:var(--accent-soft); letter-spacing:.18em; text-transform:uppercase; }
-  .btn { display:inline-flex; align-items:center; justify-content:center; gap:10px; padding:16px 28px; border-radius:12px; font-size:17px; font-weight:700; min-height:52px; }
-  .btn-primary { background:var(--accent); color:#fff; box-shadow:0 8px 32px rgba(124,92,255,.35); } .btn-primary:hover { color:#fff; background:#8b6fff; }
-  .btn-ghost { color:rgba(245,245,247,.86); border:1px solid rgba(255,255,255,.14); font-weight:500; } .btn-ghost:hover { color:#fff; border-color:rgba(255,255,255,.3); }
-
-  nav { border-bottom:1px solid var(--line); }
-  nav .wrap { display:flex; align-items:center; justify-content:space-between; padding-top:22px; padding-bottom:22px; }
-  .brand { display:flex; align-items:center; gap:12px; font-size:14px; font-weight:500; letter-spacing:.1em; color:rgba(245,245,247,.86); }
-  .brand img { width:32px; height:32px; border-radius:8px; }
-  nav ul { display:flex; gap:32px; list-style:none; margin:0; padding:0; }
-  nav ul a { font-size:15px; color:rgba(245,245,247,.7); }
-
-  .hero { position:relative; overflow:hidden; text-align:center; }
-  .hero::before { content:""; position:absolute; inset:0; background:radial-gradient(ellipse 60% 45% at 50% 0%, rgba(124,92,255,.28), transparent 70%); pointer-events:none; }
-  .hero .wrap { position:relative; display:flex; flex-direction:column; align-items:center; gap:28px; padding-top:96px; padding-bottom:72px; }
-  .hero h1 { font-size:clamp(38px,6vw,72px); line-height:1.02; letter-spacing:-.03em; max-width:900px; text-wrap:balance; }
-  .hero .lead { font-size:clamp(16px,2vw,20px); line-height:1.5; color:rgba(245,245,247,.68); max-width:620px; text-wrap:pretty; }
-  .hero .actions { display:flex; align-items:center; gap:16px; margin-top:8px; flex-wrap:wrap; justify-content:center; }
-  .hero .meta { font-size:12px; color:rgba(245,245,247,.45); }
-
-  /* ---- Notch demo ---- */
-  .demo { margin-top:40px; width:100%; max-width:1040px; display:flex; flex-direction:column; align-items:center; gap:18px; }
-  .tags { display:flex; gap:28px; font-size:12px; letter-spacing:.14em; }
-  .tags span { opacity:.35; }
-  .lid { width:100%; height:28px; background:#1c1c1f; border:1px solid rgba(255,255,255,.1); border-bottom:none; border-radius:18px 18px 0 0; }
-  .screen { width:100%; height:320px; background:linear-gradient(160deg, #e9e4ff 0%, #cfd9ff 45%, #dff1f5 100%); border-left:1px solid rgba(255,255,255,.1); border-right:1px solid rgba(255,255,255,.1); position:relative; overflow:hidden; }
-  .panel { position:absolute; top:0; left:50%; transform:translateX(-50%); width:560px; height:300px; background:#000; border-radius:0 0 22px 22px; box-shadow:0 24px 60px rgba(20,10,60,.35); overflow:hidden; display:flex; flex-direction:column; align-items:center; padding:0 16px 14px; animation:notch-panel 9s cubic-bezier(.32,.72,0,1) infinite; }
-  .panel .head { display:flex; align-items:center; justify-content:space-between; height:34px; flex:none; width:528px; animation:notch-header 9s ease-in-out infinite; }
-  .panel .head > div { display:flex; align-items:center; gap:7px; font-size:10.5px; white-space:nowrap; }
-  .panel .head .dot { width:6px; height:6px; border-radius:50%; background:var(--running); }
-  .panel .game { flex:1; min-height:0; width:528px; border-radius:10px; background:linear-gradient(160deg,#2a1f5e 0%,#12102a 55%,#0a0a14 100%); position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:11px; color:rgba(245,245,247,.35); letter-spacing:.14em; animation:notch-screen 9s ease-in-out infinite; }
-  .panel .game img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; image-rendering:pixelated; }
-  .scan { position:absolute; left:0; right:0; height:40%; background:linear-gradient(to bottom,transparent,rgba(255,255,255,.05),transparent); animation:scan 4s linear infinite; pointer-events:none; }
-  .cursor { position:absolute; top:0; left:50%; margin-left:-60px; animation:notch-cursor 9s cubic-bezier(.4,0,.2,1) infinite; }
-  @keyframes notch-panel { 0%,25%{width:200px;height:34px} 30%,55%{width:560px;height:34px} 60%,92%{width:560px;height:300px} 100%{width:200px;height:34px} }
-  @keyframes notch-header { 0%,27%{opacity:0} 33%,90%{opacity:1} 96%,100%{opacity:0} }
-  @keyframes notch-screen { 0%,60%{opacity:0} 68%,90%{opacity:1} 93%,100%{opacity:0} }
-  @keyframes notch-cursor { 0%,22%{transform:translate(180px,90px);opacity:1} 30%,55%{transform:translate(40px,14px);opacity:1} 57%{transform:translate(40px,14px) scale(.85)} 60%,88%{transform:translate(40px,14px) scale(1);opacity:1} 92%,100%{transform:translate(180px,90px);opacity:0} }
-  @keyframes scan { from{transform:translateY(-100%)} to{transform:translateY(100%)} }
-  @keyframes tag-a { 0%,25%{opacity:1} 30%,100%{opacity:.35} }
-  @keyframes tag-b { 0%,27%{opacity:.35} 30%,55%{opacity:1} 60%,100%{opacity:.35} }
-  @keyframes tag-c { 0%,57%{opacity:.35} 60%,92%{opacity:1} 96%,100%{opacity:.35} }
-  .tag-a{animation:tag-a 9s infinite} .tag-b{animation:tag-b 9s infinite} .tag-c{animation:tag-c 9s infinite}
-  @media (prefers-reduced-motion: reduce) { .panel,.panel .head,.panel .game,.cursor,.tags span,.scan { animation:none !important; opacity:1; } .cursor{display:none} }
-
-  section { border-top:1px solid var(--line); }
-  section .wrap { padding-top:72px; padding-bottom:72px; }
-  .steps { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:32px; }
-  .steps > div { display:flex; flex-direction:column; gap:12px; }
-  .steps h3 { font-size:22px; letter-spacing:-.01em; }
-  .steps p, .muted { font-size:16px; line-height:1.55; color:var(--muted); }
-  .steps .eyebrow { text-transform:none; letter-spacing:.06em; }
-  kbd { font-family:'JetBrains Mono',Menlo,monospace; font-size:18px; background:rgba(255,255,255,.08); padding:3px 8px; border-radius:6px; }
-
-  .features .wrap { display:flex; flex-direction:column; gap:40px; }
-  .features h2, .cta h2 { font-size:clamp(28px,4vw,40px); letter-spacing:-.025em; line-height:1.1; }
-  .features .intro { display:flex; flex-direction:column; gap:12px; max-width:640px; }
-  .cards { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; }
-  .card { display:flex; flex-direction:column; gap:8px; padding:24px; border:1px solid rgba(255,255,255,.1); border-radius:14px; background:rgba(255,255,255,.025); }
-  .card .mono { font-size:13px; color:rgba(245,245,247,.9); }
-  .card p { font-size:15px; line-height:1.5; color:var(--muted); }
-
-  .controls .wrap { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:64px; align-items:start; }
-  .controls .intro { display:flex; flex-direction:column; gap:12px; }
-  .controls h2 { font-size:clamp(26px,3.5vw,36px); letter-spacing:-.025em; line-height:1.1; }
-  .keys { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 24px; font-size:15px; }
-  .keys > div { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--line); }
-  .keys > div span:first-child { color:var(--muted); }
-  .keys .note { grid-column:span 2; justify-content:flex-start; align-items:center; gap:10px; border:0; padding-top:14px; font-size:14px; }
-  .keys .note span { color:var(--accent-soft) !important; }
-
-  .cta .wrap { display:flex; flex-direction:column; align-items:center; gap:20px; padding-top:96px; padding-bottom:96px; text-align:center; }
-  .cta img { width:72px; height:72px; border-radius:16px; }
-  .cta p { font-size:17px; color:var(--muted); max-width:520px; }
-
-  footer { border-top:1px solid var(--line); }
-  footer .wrap { display:flex; align-items:center; justify-content:space-between; gap:16px; padding-top:24px; padding-bottom:24px; font-size:13px; color:rgba(245,245,247,.4); flex-wrap:wrap; }
-
-  @media (max-width: 860px) {
-    .wrap { padding:0 20px; }
-    nav ul li:not(:last-child) { display:none; }
-    .hero .wrap { padding-top:48px; padding-bottom:40px; gap:18px; }
-    .hero .actions { flex-direction:column; width:100%; } .hero .actions .btn { width:100%; }
-    .screen { height:190px; }
-    .panel { padding:0 12px 10px; border-radius:0 0 14px 14px; animation-name:notch-panel-m; }
-    .panel .head { height:24px; width:236px; font-size:9px; }
-    .panel .game { width:236px; border-radius:7px; }
-    .cursor { margin-left:-30px; animation-name:notch-cursor-m; }
-    .tags { gap:16px; font-size:10px; }
-    @keyframes notch-panel-m { 0%,25%{width:120px;height:24px} 30%,55%{width:260px;height:24px} 60%,92%{width:260px;height:170px} 100%{width:120px;height:24px} }
-    @keyframes notch-cursor-m { 0%,22%{transform:translate(90px,60px);opacity:1} 30%,55%{transform:translate(20px,8px);opacity:1} 57%{transform:translate(20px,8px) scale(.85)} 60%,88%{transform:translate(20px,8px) scale(1);opacity:1} 92%,100%{transform:translate(90px,60px);opacity:0} }
-    section .wrap { padding-top:40px; padding-bottom:40px; }
-    .steps, .cards, .controls .wrap, .keys { grid-template-columns:1fr; gap:24px; }
-    .keys { gap:0; } .keys .note { grid-column:auto; }
-    .cta .wrap { padding-top:48px; padding-bottom:48px; }
-    footer .wrap { flex-direction:column; align-items:flex-start; }
-  }
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -127,6 +25,7 @@
     <li><a href="#recursos">Recursos</a></li>
     <li><a href="#controles">Controles</a></li>
     <li><a href="https://github.com/aricarmo/SwiftSnes">GitHub</a></li>
+    <li><a href="en/" lang="en" hreflang="en" class="mono">EN</a></li>
   </ul>
 </div></nav>
 
@@ -141,7 +40,7 @@
     </a>
     <a class="btn btn-ghost" href="https://github.com/aricarmo/SwiftSnes">Ver código-fonte</a>
   </div>
-  <span class="meta mono">.dmg · v1.0 · Apple Silicon e Intel · sandbox ligado</span>
+  <span class="meta mono">.dmg · v1.6 · Apple Silicon e Intel · sandbox ligado</span>
 
   <div class="demo" aria-hidden="true">
     <div class="tags mono"><span class="tag-a">1 · RECOLHIDO</span><span class="tag-b">2 · HOVER</span><span class="tag-c">3 · EXPANDIDO</span></div>
