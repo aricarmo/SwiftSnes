@@ -69,6 +69,25 @@ struct SettingsBody: View {
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
 
+            SettingToggleRow(title: "Efeito TV antiga",
+                             detail: "Simula tela de tubo: scanlines, curvatura e fósforo",
+                             isOn: Binding(get: { settings.retroEffectEnabled },
+                                           set: { settings.retroEffectEnabled = $0 }))
+            if settings.retroEffectEnabled {
+                HStack(spacing: 4) {
+                    ForEach(ScreenFilter.allCases.filter { $0 != .clean }) { mode in
+                        FilterChip(label: mode.label,
+                                   isSelected: settings.screenFilter == mode,
+                                   onSelect: { settings.screenFilter = mode })
+                    }
+                }
+                Text(settings.screenFilter.detail)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(NotchPalette.primaryText.opacity(0.4))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             Divider().overlay(NotchPalette.divider)
             SectionLabel("COMPORTAMENTO")
 
@@ -340,6 +359,35 @@ private struct ScreenSizeCard: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .strokeBorder(isSelected ? NotchPalette.accentSoft.opacity(0.55) : .clear, lineWidth: 1)
             )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// Botão de filtro retro da tela, no estilo dos chips do painel.
+private struct FilterChip: View {
+    let label: String
+    let isSelected: Bool
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            Text(label)
+                .font(.system(size: 10.5))
+                .lineLimit(1)
+                .foregroundStyle(isSelected ? NotchPalette.accentBright
+                                 : NotchPalette.primaryText.opacity(0.55))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(isSelected ? NotchPalette.accent.opacity(0.22) : Color.white.opacity(0.05))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(isSelected ? NotchPalette.accentSoft.opacity(0.55) : .clear, lineWidth: 1)
+                )
         }
         .buttonStyle(.plain)
     }

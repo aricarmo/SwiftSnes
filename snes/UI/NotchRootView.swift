@@ -104,7 +104,8 @@ struct NotchRootView: View {
                                  panelWidth: panelWidth, onQuit: onQuit)
                         .transition(.opacity)
                 } else if vm.isROMLoaded {
-                    GameBody(vm: vm, presenter: presenter, gamepad: gamepad, videoSize: videoSize)
+                    GameBody(vm: vm, presenter: presenter, gamepad: gamepad,
+                             videoSize: videoSize, filter: settings.screenFilter)
                         .transition(.opacity)
                 } else {
                     EmptyDropBody(vm: vm, recents: recents, updater: updater, panelWidth: panelWidth)

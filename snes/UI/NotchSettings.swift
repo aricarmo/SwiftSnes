@@ -50,6 +50,8 @@ final class NotchSettings: ObservableObject {
         static let audioFade = "notch.audioFade"
         static let clickToOpen = "notch.clickToOpen"
         static let screenSize = "notch.screenSize"
+        static let screenFilter = "notch.screenFilter"
+        static let retroStyle = "notch.retroStyle"
         static let analogAsDpad = "notch.analogAsDpad"
     }
 
@@ -73,6 +75,27 @@ final class NotchSettings: ObservableObject {
     @Published var screenSize: ScreenSize {
         didSet { defaults.set(screenSize.rawValue, forKey: Key.screenSize) }
     }
+    /// Filtro retro aplicado à tela do jogo. `.clean` = efeito desligado.
+    @Published var screenFilter: ScreenFilter {
+        didSet {
+            defaults.set(screenFilter.rawValue, forKey: Key.screenFilter)
+            // Lembra o último estilo retro para religar o efeito no mesmo lugar.
+            if screenFilter != .clean {
+                defaults.set(screenFilter.rawValue, forKey: Key.retroStyle)
+            }
+        }
+    }
+
+    /// "Efeito TV antiga": desligado é tela limpa; ligado volta ao último estilo.
+    var retroEffectEnabled: Bool {
+        get { screenFilter != .clean }
+        set {
+            guard newValue != retroEffectEnabled else { return }
+            screenFilter = newValue
+                ? ScreenFilter(rawValue: defaults.string(forKey: Key.retroStyle) ?? "") ?? .crt
+                : .clean
+        }
+    }
 
     private let defaults = UserDefaults.standard
 
@@ -88,6 +111,7 @@ final class NotchSettings: ObservableObject {
         clickToOpen = defaults.bool(forKey: Key.clickToOpen)
         analogAsDpad = defaults.bool(forKey: Key.analogAsDpad)
         screenSize = ScreenSize(rawValue: defaults.string(forKey: Key.screenSize) ?? "") ?? .compact
+        screenFilter = ScreenFilter(rawValue: defaults.string(forKey: Key.screenFilter) ?? "") ?? .clean
     }
 
     var fadeDuration: TimeInterval { audioFade ? 0.15 : 0 }

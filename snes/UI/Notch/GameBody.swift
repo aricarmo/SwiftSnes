@@ -10,10 +10,11 @@ struct GameBody: View {
     @ObservedObject var gamepad: GamepadInput
 
     let videoSize: CGSize
+    let filter: ScreenFilter
 
     var body: some View {
         VStack(spacing: 8) {
-            ScreenView(source: vm.frameSource)
+            ScreenView(source: vm.frameSource, filter: filter)
                 .frame(width: videoSize.width, height: videoSize.height)
                 .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                 .overlay(
