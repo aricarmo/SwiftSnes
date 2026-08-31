@@ -5,8 +5,10 @@ import AppKit
 import SwiftUI
 
 enum NotchMetrics {
-    /// Altura da faixa que cobre o notch (e da pílula colapsada).
-    static let minHeaderHeight: CGFloat = 37
+    /// Altura da faixa quando nem o entalhe nem a barra de menus dão a medida
+    /// (barra de menus oculta). Nos demais casos a faixa usa a altura exata
+    /// deles: um piso fixo deixava a pílula invadindo as janelas de baixo.
+    static let fallbackHeaderHeight: CGFloat = 37
     static let bottomCornerRadius: CGFloat = 26
     /// Raio dos cantos inferiores do entalhe físico dos MacBooks.
     static let notchCornerRadius: CGFloat = 11
@@ -54,7 +56,10 @@ enum NotchMetrics {
     }
 
     static func headerHeight(on screen: NSScreen) -> CGFloat {
-        max(minHeaderHeight, screen.safeAreaInsets.top)
+        if screen.safeAreaInsets.top > 0 { return screen.safeAreaInsets.top }
+        // Sem notch, a pílula não deve passar da barra de menus.
+        let menuBar = screen.frame.maxY - screen.visibleFrame.maxY
+        return menuBar > 0 ? menuBar : fallbackHeaderHeight
     }
 
     /// Largura do entalhe físico. Zero em Macs sem notch.
