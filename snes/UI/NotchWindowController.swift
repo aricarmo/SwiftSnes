@@ -40,6 +40,7 @@ final class NotchWindowController {
     private var hoverMonitor: NotchHoverMonitor?
     private var keyMonitor: Any?
     private var clickMonitor: Any?
+    private var outsideClickMonitor: Any?
     private var pinHotKey: GlobalHotKey?
     private var cancellables = Set<AnyCancellable>()
     private var previousApp: NSRunningApplication?
@@ -143,6 +144,7 @@ final class NotchWindowController {
         installHoverMonitor()
         installKeyMonitor()
         installClickMonitor()
+        installOutsideClickMonitor()
         installHotKey()
         observeGamepad()
     }
@@ -157,8 +159,10 @@ final class NotchWindowController {
     func invalidate() {
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
+        if let outsideClickMonitor { NSEvent.removeMonitor(outsideClickMonitor) }
         keyMonitor = nil
         clickMonitor = nil
+        outsideClickMonitor = nil
         hoverMonitor?.invalidate()
         pinHotKey?.invalidate()
     }
@@ -497,10 +501,51 @@ final class NotchWindowController {
     /// O monitor local recebe o mouseDown de qualquer forma e expande de primeira.
     private func installClickMonitor() {
         clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] event in
-            guard let self, event.window === panel, !presenter.isOpen,
-                  hotRect.contains(NSEvent.mouseLocation) else { return event }
+            guard let self else { return event }
+            guard event.window === panel, !presenter.isOpen,
+                  hotRect.contains(NSEvent.mouseLocation) else {
+                // O monitor global não vê eventos do nosso próprio app: um
+                // clique que caia na janela mas fora da faixa visível também
+                // conta como "fora do painel".
+                collapseIfClickedOutside(NSEvent.mouseLocation)
+                return event
+            }
             presenter.openImmediately()
             return nil
+        }
+    }
+
+    /// Clique fora do painel recolhe para o notch e solta o pin. Sem isso, o
+    /// painel fixado não deixava o usuário sair: ao clicar noutra janela o app
+    /// desativava, o `syncFocus` via "preciso do teclado" e roubava o foco de
+    /// volta com `activate(ignoringOtherApps:)` — parecia que o clique não
+    /// vazava para as janelas de trás. O monitor global vê o mouseDown entregue
+    /// aos outros apps; o local cobre um clique que ainda caia na nossa janela
+    /// fora da faixa visível (o `ignoresMouseEvents` é atualizado por polling).
+    private func installOutsideClickMonitor() {
+        let events: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown]
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: events) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.collapseIfClickedOutside(NSEvent.mouseLocation)
+            }
+        }
+    }
+
+    private func collapseIfClickedOutside(_ location: NSPoint) {
+        // Só quando o painel está segurando o teclado/foco: fixado com controle
+        // físico ele não rouba nada, e o pin serve justamente para seguir
+        // jogando enquanto se usa outro app — não deve cair num clique fora.
+        guard presenter.needsKeyboard,
+              !viewModel.isPresentingDialog,
+              !hotRect.contains(location) else { return }
+        // O clique já vai ativar a janela de baixo; não devolver o foco ao app
+        // que estava na frente antes do pin.
+        previousApp = nil
+        presenter.isPinned = false
+        presenter.closeImmediately()
+        if NSApp.isActive {
+            releaseJoypad()
+            panel.resignKey()
         }
     }
 
