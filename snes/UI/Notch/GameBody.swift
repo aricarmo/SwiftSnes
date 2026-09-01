@@ -13,13 +13,18 @@ struct GameBody: View {
     let filter: ScreenFilter
 
     @ObservedObject private var settings = NotchSettings.shared
-    /// OSD de volume visível por cima do jogo; some sozinho.
-    @State private var osdVisible = false
-    @State private var osdHide: DispatchWorkItem?
+    /// OSD de volume composto no framebuffer; some sozinho com fade.
+    @State private var osdAlpha: Double = 0
+    @State private var osdFade: Task<Void, Never>?
 
     var body: some View {
         VStack(spacing: 8) {
-            ScreenView(source: vm.frameSource, filter: filter)
+            ScreenView(source: vm.frameSource, filter: filter,
+                       osd: osdAlpha > 0
+                           ? VolumeOSDRaster.overlay(volume: settings.volume,
+                                                     muted: settings.muted,
+                                                     alpha: osdAlpha)
+                           : nil)
                 .frame(width: videoSize.width, height: videoSize.height)
                 .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                 .overlay(
@@ -40,13 +45,6 @@ struct GameBody: View {
                             .transition(.opacity)
                     }
                 }
-                .overlay(alignment: .bottomLeading) {
-                    if osdVisible {
-                        VolumeOSD(volume: settings.volume, muted: settings.muted)
-                            .padding(16)
-                            .transition(.opacity)
-                    }
-                }
                 .animation(.easeInOut(duration: 0.2), value: vm.resumeNotice)
                 .onChange(of: settings.volume) { _, _ in showVolumeOSD() }
                 .onChange(of: settings.muted) { _, _ in showVolumeOSD() }
@@ -64,44 +62,97 @@ struct GameBody: View {
     }
 
     private func showVolumeOSD() {
-        withAnimation(.easeOut(duration: 0.12)) { osdVisible = true }
-        osdHide?.cancel()
-        let work = DispatchWorkItem {
-            withAnimation(.easeIn(duration: 0.3)) { osdVisible = false }
+        osdFade?.cancel()
+        osdAlpha = 1
+        osdFade = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.6))
+            guard !Task.isCancelled else { return }
+            for step in stride(from: 0.75, through: 0, by: -0.25) {
+                osdAlpha = step
+                guard step > 0 else { break }
+                try? await Task.sleep(for: .milliseconds(60))
+                guard !Task.isCancelled else { return }
+            }
         }
-        osdHide = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6, execute: work)
     }
 }
 
 // MARK: - Volume
 
-/// OSD por cima do jogo no estilo de TVs antigas: "VOLUME" verde e blocos.
-private struct VolumeOSD: View {
-    let volume: Double
-    let muted: Bool
-
+/// OSD estilo TV antiga ("VOLUME" verde e blocos), rasterizado em pixels do
+/// framebuffer 256×224 e composto no frame antes dos shaders: assim scanlines,
+/// curvatura e fósforo também o afetam, igual a um OSD de TV de verdade.
+private enum VolumeOSDRaster {
     private static let blocks = 15
-    private static let green = Color(red: 0.208, green: 1.0, blue: 0.427) // #35ff6d
+    private static let scale = 3          // fonte 3×5 desenhada em 9×15 px
+    private static let barW = 4, barH = 14, barGap = 2
+    private static let shadowOffset = 2
+    private static let width = blocks * (barW + barGap) - barGap + shadowOffset
+    private static let height = 5 * scale + 4 + barH + shadowOffset
 
-    private var filled: Int {
-        muted ? 0 : min(Self.blocks, Int((volume * Double(Self.blocks)).rounded()))
+    private static let green: (UInt8, UInt8, UInt8, UInt8) = (53, 255, 109, 255) // #35ff6d
+    private static let greenDim: (UInt8, UInt8, UInt8, UInt8) = (12, 56, 24, 56) // 22%
+    private static let shadow: (UInt8, UInt8, UInt8, UInt8) = (0, 0, 0, 217)
+    private static let shadowDim: (UInt8, UInt8, UInt8, UInt8) = (0, 0, 0, 48)
+
+    /// Fonte 3×5, bit mais alto = coluna da esquerda.
+    private static let glyphs: [Character: [UInt8]] = [
+        "V": [0b101, 0b101, 0b101, 0b101, 0b010],
+        "O": [0b111, 0b101, 0b101, 0b101, 0b111],
+        "L": [0b100, 0b100, 0b100, 0b100, 0b111],
+        "U": [0b101, 0b101, 0b101, 0b101, 0b111],
+        "M": [0b101, 0b111, 0b101, 0b101, 0b101],
+        "E": [0b111, 0b100, 0b110, 0b100, 0b111],
+        "D": [0b110, 0b101, 0b101, 0b101, 0b110],
+    ]
+
+    static func overlay(volume: Double, muted: Bool, alpha: Double) -> FrameOverlay {
+        var px = [UInt8](repeating: 0, count: width * height * 4)
+        let filled = muted ? 0 : min(blocks, Int((volume * Double(blocks)).rounded()))
+
+        let text = muted ? "MUDO" : "VOLUME"
+        drawText(text, into: &px, x: shadowOffset, y: shadowOffset, color: shadow)
+        drawText(text, into: &px, x: 0, y: 0, color: green)
+
+        let barsY = 5 * scale + 4
+        for i in 0..<blocks {
+            let x = i * (barW + barGap)
+            let lit = i < filled
+            fill(&px, x: x + shadowOffset, y: barsY + shadowOffset, w: barW, h: barH,
+                 color: lit ? shadow : shadowDim)
+            fill(&px, x: x, y: barsY, w: barW, h: barH, color: lit ? green : greenDim)
+        }
+
+        return FrameOverlay(x: 12, y: FrameOverlay.frameHeight - height - 12,
+                            width: width, height: height,
+                            alpha: Float(alpha), pixels: px)
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(muted ? "MUDO" : "VOLUME")
-                .font(.system(size: 11, weight: .heavy, design: .monospaced))
-                .kerning(2)
-                .foregroundStyle(Self.green)
-                .shadow(color: .black.opacity(0.85), radius: 0, x: 2, y: 2)
-            HStack(spacing: 3) {
-                ForEach(0..<Self.blocks, id: \.self) { i in
-                    Rectangle()
-                        .fill(i < filled ? Self.green : Self.green.opacity(0.22))
-                        .frame(width: 5, height: 18)
-                        .shadow(color: .black.opacity(0.85), radius: 0, x: 1.5, y: 1.5)
+    private static func drawText(_ text: String, into px: inout [UInt8],
+                                 x: Int, y: Int,
+                                 color: (UInt8, UInt8, UInt8, UInt8)) {
+        var cx = x
+        for ch in text {
+            guard let rows = glyphs[ch] else { continue }
+            for (ry, bits) in rows.enumerated() {
+                for bx in 0..<3 where bits & (0b100 >> bx) != 0 {
+                    fill(&px, x: cx + bx * scale, y: y + ry * scale,
+                         w: scale, h: scale, color: color)
                 }
+            }
+            cx += 3 * scale + 2
+        }
+    }
+
+    private static func fill(_ px: inout [UInt8], x: Int, y: Int, w: Int, h: Int,
+                             color: (UInt8, UInt8, UInt8, UInt8)) {
+        for row in y..<min(y + h, height) where row >= 0 {
+            for col in x..<min(x + w, width) where col >= 0 {
+                let i = (row * width + col) * 4
+                px[i] = color.0
+                px[i + 1] = color.1
+                px[i + 2] = color.2
+                px[i + 3] = color.3
             }
         }
     }
