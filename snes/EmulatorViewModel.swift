@@ -70,6 +70,11 @@ final class EmulatorViewModel: ObservableObject {
     private var lastFPSUpdate = Date()
     private var cancellables = Set<AnyCancellable>()
 
+    /// Segura o App Nap enquanto o jogo roda: sem isso o macOS começa a
+    /// espaçar timers e display links de um app "invisível" depois de alguns
+    /// minutos, e o frame pacing degrada.
+    private var activityToken: NSObjectProtocol?
+
     /// A ROM já foi ligada uma vez: retomar não pode resetar o console.
     private var poweredOn = false
     /// O painel quer o jogo rodando (aberto, fixado ou pausa automática desligada).
@@ -215,6 +220,11 @@ final class EmulatorViewModel: ObservableObject {
         }
 
         isRunning = true
+        if activityToken == nil {
+            activityToken = ProcessInfo.processInfo.beginActivity(
+                options: [.userInitiated, .latencyCritical],
+                reason: "Emulação SNES rodando")
+        }
         // Zera a janela de medição: senão o primeiro FPS após retomar
         // divide os frames novos pelo tempo em que estava pausado.
         frameCount = 0
@@ -226,6 +236,10 @@ final class EmulatorViewModel: ObservableObject {
         guard isRunning else { return }
         stopDisplayLink()
         isRunning = false
+        if let token = activityToken {
+            ProcessInfo.processInfo.endActivity(token)
+            activityToken = nil
+        }
         snes.suspend(fadeDuration: NotchSettings.shared.fadeDuration)
         saveSRAMIfNeeded()
         saveStateForResume()
@@ -260,6 +274,28 @@ final class EmulatorViewModel: ObservableObject {
         // Se o app ficou parado (tracking de menu, sleep), não tenta "recuperar"
         // o atraso rodando dezenas de frames de uma vez.
         frameAccumulator += min(now - lastTick, Self.frameDuration * 2)
+
+        // O display e o CoreAudio têm relógios físicos distintos, e cada engasgo
+        // do main thread deixa amostras não consumidas para trás (o callback toca
+        // silêncio sem avançar o read). Sem correção, o buffer só cresce — até
+        // ~1 s de delay — ou seca. Aqui a emulação se cadencia pelo nível do
+        // buffer: no máximo ±1 frame por tick, imperceptível no vídeo.
+        if snes.audioIsRunning {
+            let buffered = snes.audioBufferedSamples
+            let slack = Int(32000 * Self.frameDuration * 3)  // ~3 frames de áudio
+            if buffered > snes.audioPacingTarget + slack {
+                frameAccumulator -= Self.frameDuration
+                pacingSkips += 1
+            } else if buffered < snes.audioPacingTarget - slack,
+                      now - lastTick < Self.frameDuration * 1.25 {
+                // Só adianta se o tick chegou no horário: com o main thread já
+                // atrasado, pedir frames extras satura e vira bola de neve.
+                frameAccumulator += Self.frameDuration
+                pacingBoosts += 1
+            }
+        }
+        if frameAccumulator < 0 { frameAccumulator = 0 }
+
         var budget = 2
         while frameAccumulator >= Self.frameDuration && budget > 0 {
             frameAccumulator -= Self.frameDuration
@@ -269,6 +305,7 @@ final class EmulatorViewModel: ObservableObject {
     }
 
     private func runFrame() {
+        let t0 = CACurrentMediaTime()
         snes.runFrame()
         let cgImage = snes.ppu.getFrameImage()
         if let cgImage {
@@ -276,6 +313,32 @@ final class EmulatorViewModel: ObservableObject {
         }
         frameCount += 1
         history.frameDidRun { (snes.saveState(), cgImage) }
+        recordFrameTime(CACurrentMediaTime() - t0)
+    }
+
+    // MARK: - Diagnóstico de performance
+
+    private var perfFrames = 0
+    private var perfTotal: Double = 0
+    private var perfMax: Double = 0
+    private var pacingSkips = 0
+    private var pacingBoosts = 0
+
+    /// A cada ~5 s de jogo, uma linha no log com o custo real do frame e o
+    /// estado do pacing de áudio: `log stream --predicate 'category == "emulator"'`.
+    private func recordFrameTime(_ dt: TimeInterval) {
+        perfFrames += 1
+        perfTotal += dt
+        perfMax = max(perfMax, dt)
+        guard perfFrames >= 300 else { return }
+        let avgMs = perfTotal / Double(perfFrames) * 1000
+        let maxMs = perfMax * 1000
+        Log.emulator.notice("perf: frame avg \(avgMs, format: .fixed(precision: 2))ms max \(maxMs, format: .fixed(precision: 2))ms | áudio buf \(self.snes.audioBufferedSamples)/\(self.snes.audioPacingTarget) under \(self.snes.audioUnderruns) over \(self.snes.audioOverruns) | pacing -\(self.pacingSkips)/+\(self.pacingBoosts)")
+        perfFrames = 0
+        perfTotal = 0
+        perfMax = 0
+        pacingSkips = 0
+        pacingBoosts = 0
     }
 
     // MARK: - Voltar no tempo

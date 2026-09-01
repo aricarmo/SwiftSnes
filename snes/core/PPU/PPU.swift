@@ -211,14 +211,12 @@ final class PPU {
             return UInt8((multiplyResult >> 16) & 0xFF)
             
         case 0x37:  // SLHV - Software latch H/V counter
-            if !latchedH {
-                hCounterLatched = hCounter
-                latchedH = true
-            }
-            if !latchedV {
-                vCounterLatched = vCounter
-                latchedV = true
-            }
+            // Cada leitura re-latcha os contadores; `latchedH/V` são os
+            // flip-flops de leitura de $213C/$213D, não um bloqueio do latch.
+            hCounterLatched = hCounter
+            vCounterLatched = vCounter
+            latchedH = true
+            latchedV = true
             return ppu1OpenBus
             
         case 0x38:  // OAMDATAREAD - OAM data read
@@ -726,6 +724,11 @@ final class PPU {
                 }
                 // Dispara NMI e auto-joypad read
                 bus.setVBlank(true)
+            }
+
+            if scanline == 228 {
+                // O auto-joypad read termina ~3 scanlines após o vblank
+                bus.autoJoypadReadComplete()
             }
 
             if scanline >= 262 {

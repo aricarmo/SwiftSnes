@@ -88,6 +88,7 @@ final class SNES {
 
             apu.step(cycles: totalCycles)
             memory.advanceCartDSP(cpuCycles: totalCycles)
+            memory.advanceGSU(cpuCycles: totalCycles)
 
             self.totalCycles &+= UInt64(totalCycles)
             steps += 1
@@ -115,6 +116,14 @@ final class SNES {
         get { apu.audioOutput.volume }
         set { apu.audioOutput.volume = newValue }
     }
+
+    /// Nível do ring buffer de áudio, para o laço de frames se cadenciar pelo
+    /// relógio do CoreAudio em vez do relógio do display.
+    var audioBufferedSamples: Int { apu.audioOutput.bufferedSamples }
+    var audioPacingTarget: Int { apu.audioOutput.pacingTargetBufferedSamples }
+    var audioIsRunning: Bool { apu.audioOutput.isRunning }
+    var audioUnderruns: UInt64 { apu.audioOutput.underrunEvents }
+    var audioOverruns: UInt64 { apu.audioOutput.overrunEvents }
 
     func powerOn() {
         reset()

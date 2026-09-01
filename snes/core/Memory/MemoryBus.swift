@@ -8,6 +8,7 @@ final class MemoryBus {
     private var wram = [UInt8](repeating: 0, count: 0x20000)   // 128KB Work RAM
     let cart = Cartridge()
     private(set) var cartDSP: CartDSPChip?
+    private(set) var gsu: GSUChip?
 
     // Open bus / MDR: último valor trafegado no barramento
     private var openBus: UInt8 = 0
@@ -108,6 +109,7 @@ final class MemoryBus {
     func loadROM(data: Data, firmwareDirectory: URL? = nil) throws {
         try cart.load(data: data)
         attachCartDSP(firmwareDirectory: firmwareDirectory)
+        gsu = cart.hasGSU ? GSUChip(rom: cart.rom, ramSize: cart.gsuRAMSize) : nil
     }
 
     func attachCartDSP(firmwareDirectory: URL? = nil) {
@@ -129,11 +131,62 @@ final class MemoryBus {
         cartDSP?.advance(cpuCycles: cpuCycles)
     }
 
+    /// Avança o GSU em paralelo ao CPU. 1 ciclo de CPU ≈ 8 ciclos master, a
+    /// mesma equivalência usada para o PPU (2 dots por ciclo).
+    func advanceGSU(cpuCycles: Int) {
+        guard let gsu else { return }
+        gsu.run(masterCycles: cpuCycles * 8)
+        // A linha de IRQ do GSU fica ativa até o CPU ler o SFR ($3031);
+        // rearma o pedido a cada passo enquanto isso.
+        if gsu.irqActive {
+            cpu?.triggerIRQ()
+        }
+    }
+
+    // MARK: - Roteamento do Super FX
+
+    /// I/O do GSU ($3000-$34FF nos bancos de sistema) e janelas de ROM/RAM do
+    /// cartucho. Devolve nil quando o endereço não pertence ao GSU.
+    @inline(__always)
+    private func gsuRead(_ gsu: GSUChip, bank: UInt32, offset: UInt32) -> UInt8? {
+        if offset >= 0x3000 && offset <= 0x34FF,
+           bank <= 0x3F || (bank >= 0x80 && bank <= 0xBF) {
+            return gsu.readIO(UInt16(offset))
+        }
+        if let index = cart.gsuROMIndex(bank: bank, offset: offset) {
+            return gsu.cpuReadROM(index: index, openBus: openBus)
+        }
+        if let index = cart.gsuRAMIndex(bank: bank, offset: offset) {
+            return gsu.cpuReadRAM(index: index, openBus: openBus)
+        }
+        return nil
+    }
+
+    @inline(__always)
+    private func gsuWrite(_ gsu: GSUChip, bank: UInt32, offset: UInt32, value: UInt8) -> Bool {
+        if offset >= 0x3000 && offset <= 0x34FF,
+           bank <= 0x3F || (bank >= 0x80 && bank <= 0xBF) {
+            gsu.writeIO(UInt16(offset), value)
+            return true
+        }
+        if let index = cart.gsuRAMIndex(bank: bank, offset: offset) {
+            gsu.cpuWriteRAM(index: index, value)
+            return true
+        }
+        return false
+    }
+
     // MARK: - Leitura
 
     func read8(_ address: UInt32) -> UInt8 {
         let bank = (address >> 16) & 0xFF
         let offset = address & 0xFFFF
+
+        // O GSU tem prioridade nas janelas dele (I/O, ROM e RAM do cartucho)
+        if let gsu, let value = gsuRead(gsu, bank: bank, offset: offset) {
+            openBus = value
+            return value
+        }
 
         switch bank {
         case 0x00...0x3F, 0x80...0xBF:
@@ -218,6 +271,10 @@ final class MemoryBus {
         let bank = (address >> 16) & 0xFF
         let offset = address & 0xFFFF
         openBus = value
+
+        if let gsu, gsuWrite(gsu, bank: bank, offset: offset, value: value) {
+            return
+        }
 
         switch bank {
         case 0x00...0x3F, 0x80...0xBF:
@@ -425,7 +482,10 @@ final class MemoryBus {
         return bit
     }
 
-    /// Auto-joypad read: executado pelo hardware no início do VBlank
+    /// Auto-joypad read: começa no início do VBlank. O bit de busy em $4212
+    /// precisa ficar visível por um tempo: jogos sincronizam esperando ele
+    /// subir e descer (~3 scanlines no hardware); o PPU chama
+    /// `autoJoypadReadComplete()` para baixá-lo.
     func performAutoJoypadRead() {
         guard (nmitimen & 0x01) != 0 else { return }
         autoJoypadBusy = true
@@ -436,6 +496,9 @@ final class MemoryBus {
             // jogos usam isso para detectar o controle e zeram o pad se vier 0.
             joypadShift[i] = 16
         }
+    }
+
+    func autoJoypadReadComplete() {
         autoJoypadBusy = false
     }
 
@@ -719,6 +782,7 @@ final class MemoryBus {
         joypadStrobe = false
 
         cartDSP?.boot()
+        gsu?.reset()
     }
 
     func resetDMACycles() { dmaCycles = 0 }
@@ -740,6 +804,9 @@ final class MemoryBus {
         w.put(mdmaen); w.put(hdmaen); w.put(dmaCycles)
         w.put(cartDSP != nil)
         cartDSP?.serialize(into: &w)
+        // Sem flag de presença: o GSU é determinado pela ROM (mesmo hash =
+        // mesmo chip), e states antigos de cartuchos sem GSU seguem válidos.
+        if let gsu { gsu.serialize(into: &w) }
     }
 
     func deserialize(from r: inout StateReader) throws {
@@ -766,5 +833,6 @@ final class MemoryBus {
         let hasDSP = try r.bool()
         guard hasDSP == (cartDSP != nil) else { throw StateReader.Error.sizeMismatch }
         try cartDSP?.deserialize(from: &r)
+        if let gsu { try gsu.deserialize(from: &r) }
     }
 }

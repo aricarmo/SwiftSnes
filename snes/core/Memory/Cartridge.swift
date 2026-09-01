@@ -41,6 +41,22 @@ final class Cartridge {
     private(set) var hasDSP: Bool = false
     private(set) var dspPart: CartDSPPart = .dsp1b
 
+    /// Revisão da placa dos cartuchos com Super FX. A placa de lançamento
+    /// (GSU-1, ROMs de até 1MB) mapeia ROM/RAM em janelas diferentes das
+    /// placas GSU-2 posteriores (Doom, Yoshi's Island...).
+    enum GSUBoard {
+        case gsu1
+        case gsu2
+    }
+
+    /// Cartucho com coprocessador Super FX (GSU).
+    private(set) var hasGSU: Bool = false
+    private(set) var gsuBoard: GSUBoard = .gsu1
+
+    /// RAM do cartucho para o GSU: o mínimo é 32KB (framebuffer), mesmo que o
+    /// header declare menos.
+    var gsuRAMSize: Int { max(sram.count, 0x8000) }
+
     // Offset do header dentro da ROM
     private(set) var headerOffset: Int = 0x7FC0
 
@@ -88,8 +104,10 @@ final class Cartridge {
 
         let cartType = headerByte(best.offset + 0x16)
         let extra = cartType & 0x0F
-        hasDSP = (extra == 0x03 || extra == 0x04 || extra == 0x05)
+        // O nibble alto identifica o chip extra: $0x = DSP, $1x = Super FX.
+        hasDSP = (cartType >> 4) == 0x0 && (extra == 0x03 || extra == 0x04 || extra == 0x05)
         dspPart = CartDSPFirmware.part(forTitle: title)
+        hasGSU = (cartType >> 4) == 0x1
 
         // SRAM: tamanho = 1 << n KB. Header com 0 = cartucho SEM SRAM, e isso
         // precisa ser respeitado: rotinas anti-pirataria escrevem na área de
@@ -100,11 +118,16 @@ final class Cartridge {
         sram = [UInt8](repeating: 0, count: sramSize)
         sramDirty = false
 
+        gsuBoard = rom.count <= 0x100000 ? .gsu1 : .gsu2
+
         loaded = true
 
-        Log.cart.info("\(self.title, privacy: .public) | \(self.mapper.description, privacy: .public)\(self.fastROM ? " FastROM" : "", privacy: .public)\(self.hasDSP ? " + DSP" : "", privacy: .public) | ROM \(self.rom.count / 1024)KB | SRAM \(sramSize / 1024)KB | reset $\(String(format: "%04X", self.resetVector), privacy: .public)")
+        Log.cart.info("\(self.title, privacy: .public) | \(self.mapper.description, privacy: .public)\(self.fastROM ? " FastROM" : "", privacy: .public)\(self.hasDSP ? " + DSP" : "", privacy: .public)\(self.hasGSU ? " + GSU" : "", privacy: .public) | ROM \(self.rom.count / 1024)KB | SRAM \(sramSize / 1024)KB | reset $\(String(format: "%04X", self.resetVector), privacy: .public)")
         if hasDSP {
             Log.cart.info("coprocessor \(self.dspPart.rawValue, privacy: .public) (NEC uPD77C25)")
+        }
+        if hasGSU {
+            Log.cart.info("coprocessor Super FX (placa \(self.gsuBoard == .gsu1 ? "GSU-1" : "GSU-2", privacy: .public))")
         }
     }
 
@@ -221,6 +244,68 @@ final class Cartridge {
             guard b >= 0x20 && b <= 0x3F, offset >= 0x6000, offset < 0x8000 else { return nil }
             let index = Int(b - 0x20) * 0x2000 + Int(offset - 0x6000)
             return index % sram.count
+        }
+    }
+
+    // MARK: - Janelas do Super FX
+
+    /// Área de ROM visível ao CPU num cartucho com GSU. As duas revisões de
+    /// placa expõem a ROM em janelas diferentes.
+    @inline(__always)
+    func gsuROMIndex(bank: UInt32, offset: UInt32) -> Int? {
+        guard hasGSU, !rom.isEmpty else { return nil }
+
+        switch gsuBoard {
+        case .gsu1:
+            switch bank {
+            case 0x00...0x1F, 0x80...0x9F:
+                guard offset >= 0x8000 else { return nil }
+                let index = (Int(bank & 0x1F) << 15) | Int(offset & 0x7FFF)
+                return romMask != 0 ? index & romMask : index % rom.count
+            default:
+                return nil
+            }
+
+        case .gsu2:
+            switch bank {
+            case 0x00...0x3F, 0x80...0xBF:
+                guard offset >= 0x8000 else { return nil }
+                let index = (Int(bank & 0x3F) << 15) | Int(offset & 0x7FFF)
+                return romMask != 0 ? index & romMask : index % rom.count
+            case 0x40...0x5F, 0xC0...0xDF:
+                let index = (Int(bank & 0x1F) << 16) | Int(offset)
+                return romMask != 0 ? index & romMask : index % rom.count
+            default:
+                return nil
+            }
+        }
+    }
+
+    /// Área da RAM do cartucho (do GSU) visível ao CPU. O índice volta sem
+    /// máscara: o chip aplica a máscara do tamanho real.
+    @inline(__always)
+    func gsuRAMIndex(bank: UInt32, offset: UInt32) -> Int? {
+        guard hasGSU else { return nil }
+
+        switch gsuBoard {
+        case .gsu1:
+            switch bank {
+            case 0x60...0x7D, 0xE0...0xFF:
+                return (Int(bank & 0x1F) << 16) | Int(offset)
+            default:
+                return nil
+            }
+
+        case .gsu2:
+            switch bank {
+            case 0x00...0x3F, 0x80...0xBF:
+                guard offset >= 0x6000 && offset <= 0x7FFF else { return nil }
+                return Int(offset - 0x6000)
+            case 0x70...0x71, 0xF0...0xF1:
+                return (Int(bank & 0x01) << 16) | Int(offset)
+            default:
+                return nil
+            }
         }
     }
 
