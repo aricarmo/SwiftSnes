@@ -6,13 +6,30 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		5A00000000000000000000A2 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 5A00000000000000000000A1 /* Sparkle */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		52D70C072DD4DF53001DC722 /* NotchSnes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NotchSnes.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		5A00000000000000000000A3 /* Exceptions for "snes" folder in "NotchSnes" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 52D70C062DD4DF53001DC722 /* NotchSnes */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		52D70C092DD4DF53001DC722 /* snes */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				5A00000000000000000000A3 /* Exceptions for "snes" folder in "NotchSnes" target */,
+			);
 			path = snes;
 			sourceTree = "<group>";
 		};
@@ -23,6 +40,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5A00000000000000000000A2 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +83,7 @@
 			);
 			name = NotchSnes;
 			packageProductDependencies = (
+				5A00000000000000000000A1 /* Sparkle */,
 			);
 			productName = NotchSnes;
 			productReference = 52D70C072DD4DF53001DC722 /* NotchSnes.app */;
@@ -94,6 +113,9 @@
 			);
 			mainGroup = 52D70BFE2DD4DF53001DC722;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				5A00000000000000000000A0 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 52D70C082DD4DF53001DC722 /* Products */;
 			projectDirPath = "";
@@ -255,6 +277,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = LK4R5SQ8MK;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = snes/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = NotchSnes;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
 				INFOPLIST_KEY_LSUIElement = YES;
@@ -264,7 +287,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.9;
+				MARKETING_VERSION = 2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ari.NotchSnes;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -293,6 +316,7 @@
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = snes/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = NotchSnes;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
 				INFOPLIST_KEY_LSUIElement = YES;
@@ -302,7 +326,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.9;
+				MARKETING_VERSION = 2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ari.NotchSnes;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -339,6 +363,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		5A00000000000000000000A0 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.9.6;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		5A00000000000000000000A1 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5A00000000000000000000A0 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 52D70BFF2DD4DF53001DC722 /* Project object */;
 }

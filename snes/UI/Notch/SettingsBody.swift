@@ -498,7 +498,7 @@ private struct UpdateStatusRow: View {
                     .controlSize(.small)
                     .tint(NotchPalette.primaryText.opacity(0.5))
             case .available(let release):
-                Button(action: updater.openDownloadPage) {
+                Button(action: updater.install) {
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.down.to.line")
                             .font(.system(size: 10, weight: .semibold))

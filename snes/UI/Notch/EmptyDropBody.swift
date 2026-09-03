@@ -14,7 +14,7 @@ struct EmptyDropBody: View {
     var body: some View {
         VStack(spacing: 12) {
             if let release = updater.available {
-                UpdateAvailableRow(version: release.version, action: updater.openDownloadPage)
+                UpdateAvailableRow(version: release.version, action: updater.install)
             }
 
             DropZone(action: vm.showFileDialog)

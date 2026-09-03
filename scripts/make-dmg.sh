@@ -5,7 +5,13 @@
 # Assinatura: por padrão ad-hoc (CI). Com CODE_SIGN_IDENTITY="Developer ID
 # Application" assina com timestamp, e se NOTARY_PROFILE estiver definido
 # (perfil salvo via `xcrun notarytool store-credentials`) envia o DMG para
-# notarização e grampeia o ticket.
+# notarização, grampeia o ticket e atualiza docs/appcast.xml (Sparkle).
+#
+# Release completa:
+#   VERSION=2.0 CODE_SIGN_IDENTITY="Developer ID Application" \
+#     DEVELOPMENT_TEAM=LK4R5SQ8MK NOTARY_PROFILE=NotchSnes scripts/make-dmg.sh
+#   gh release upload v2.0 dist/NotchSnes.dmg --clobber
+#   git commit docs/appcast.xml && git push   # o workflow Pages publica o feed
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -37,6 +43,19 @@ if [[ "${1:-}" != "--skip-build" ]]; then
     build | tail -3
 fi
 
+if [[ "$IDENTITY" != "-" ]]; then
+  # O xcodebuild só assina o Sparkle.framework em si; os XPC/helpers dentro dele
+  # continuam ad-hoc, e num app sandboxed o Installer.xpc precisa do mesmo Team
+  # ID do app (e a notarização rejeita ad-hoc). Reassina de dentro para fora.
+  SPARKLE="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
+  for item in "$SPARKLE/XPCServices/Installer.xpc" "$SPARKLE/XPCServices/Downloader.xpc" \
+              "$SPARKLE/Autoupdate" "$SPARKLE/Updater.app" \
+              "$APP/Contents/Frameworks/Sparkle.framework" "$APP"; do
+    codesign --force --sign "$IDENTITY" --timestamp --options runtime \
+      --preserve-metadata=entitlements "$item"
+  done
+fi
+
 rm -rf "$STAGE" && mkdir -p "$STAGE" dist
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
@@ -49,6 +68,7 @@ if [[ "$IDENTITY" != "-" ]]; then
     xcrun notarytool submit "$OUT" --keychain-profile "$NOTARY_PROFILE" --wait
     xcrun stapler staple "$OUT"
     spctl -a -t open --context context:primary-signature -v "$OUT"
+    scripts/update-appcast.sh "$OUT"
   fi
 fi
 

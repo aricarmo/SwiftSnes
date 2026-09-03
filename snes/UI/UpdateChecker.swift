@@ -1,17 +1,19 @@
 //  UpdateChecker.swift
-//  Consulta a última release no GitHub e avisa quando há versão mais nova que
-//  a instalada. Não baixa nada: "Baixar" abre a página da release no navegador.
+//  Fachada do Sparkle para o painel: espelha o ciclo de verificação num
+//  `State` observável e dispara o fluxo padrão (prompt → download → "Instalar e
+//  reiniciar"). O feed é o docs/appcast.xml publicado no GitHub Pages; a
+//  instalação roda no XPC Installer do Sparkle porque o app é sandboxed.
 
 import AppKit
 import Combine
+import Sparkle
 
 @MainActor
-final class UpdateChecker: ObservableObject {
+final class UpdateChecker: NSObject, ObservableObject {
     static let shared = UpdateChecker()
 
     struct Release: Equatable {
         let version: String
-        let url: URL
         /// Primeira linha das notas da release, para o subtítulo.
         let summary: String?
     }
@@ -28,9 +30,6 @@ final class UpdateChecker: ObservableObject {
     /// A engrenagem fica lilás até o usuário abrir os ajustes.
     @Published private(set) var seen = true
 
-    nonisolated static let repo = "aricarmo/SwiftSnes"
-    static let interval: TimeInterval = 24 * 60 * 60
-
     var currentVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
     }
@@ -40,91 +39,115 @@ final class UpdateChecker: ObservableObject {
         return nil
     }
 
-    private var timer: Timer?
-    private var task: Task<Void, Never>?
+    private var controller: SPUStandardUpdaterController!
 
-    private init() {}
-
-    func start() {
-        check()
-        let timer = Timer(timeInterval: Self.interval, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.check() }
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
+    private override init() {
+        super.init()
+        controller = SPUStandardUpdaterController(startingUpdater: false,
+                                                  updaterDelegate: self,
+                                                  userDriverDelegate: self)
     }
 
+    /// Liga o Sparkle: ele mesmo checa no lançamento e a cada 24h
+    /// (SUEnableAutomaticChecks/SUScheduledCheckInterval no Info.plist).
+    func start() {
+        // Builds direto do Xcode ficam com o CURRENT_PROJECT_VERSION=1 do
+        // projeto; qualquer release (build = git rev-list --count) seria "mais
+        // nova" e o prompt apareceria a cada lançamento durante o desenvolvimento.
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+        guard build != "1" || ProcessInfo.processInfo.environment["NOTCHSNES_APPCAST"] != nil else { return }
+        controller.startUpdater()
+    }
+
+    /// Verificação pedida pelo usuário: mostra o prompt do Sparkle com o
+    /// resultado, seja "Instalar" ou "você já está na versão mais recente".
     func check() {
-        guard state != .checking else { return }
-        state = .checking
-        task?.cancel()
-        task = Task { [weak self] in
-            let result = await Self.fetchLatest()
-            guard !Task.isCancelled, let self else { return }
-            switch result {
-            case .failure:
-                self.state = .failed
-            case .success(let release):
-                if Self.isNewer(release.version, than: self.currentVersion) {
-                    if self.available != release { self.seen = false }
-                    self.state = .available(release)
-                } else {
-                    self.state = .upToDate(Date())
-                }
-            }
-        }
+        controller.checkForUpdates(nil)
     }
 
     func markSeen() {
         seen = true
     }
 
-    func openDownloadPage() {
-        guard let release = available else { return }
-        NSWorkspace.shared.open(release.url)
+    /// Reabre o prompt do Sparkle já com a atualização encontrada.
+    func install() {
+        controller.checkForUpdates(nil)
+    }
+}
+
+// MARK: - SPUUpdaterDelegate
+
+extension UpdateChecker: SPUUpdaterDelegate {
+    nonisolated func feedURLString(for updater: SPUUpdater) -> String? {
+        // NOTCHSNES_APPCAST=http://localhost:8765/appcast.xml permite testar o
+        // fluxo com um feed local (file:// não passa pelo sandbox).
+        ProcessInfo.processInfo.environment["NOTCHSNES_APPCAST"]
     }
 
-    // MARK: - GitHub
-
-    private struct LatestPayload: Decodable {
-        let tag_name: String
-        let html_url: URL
-        let body: String?
+    nonisolated func updater(_ updater: SPUUpdater, mayPerform updateCheck: SPUUpdateCheck) throws {
+        MainActor.assumeIsolated { state = .checking }
     }
 
-    nonisolated private static func fetchLatest() async -> Result<Release, Error> {
-        var request = URLRequest(url: URL(string: "https://api.github.com/repos/\(repo)/releases/latest")!)
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("NotchSnes", forHTTPHeaderField: "User-Agent")
-        request.timeoutInterval = 15
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-                throw URLError(.badServerResponse)
+    nonisolated func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
+        let release = Release(version: item.displayVersionString, summary: Self.summary(of: item))
+        MainActor.assumeIsolated {
+            if available != release { seen = false }
+            state = .available(release)
+        }
+    }
+
+    nonisolated func updaterDidNotFindUpdate(_ updater: SPUUpdater, error: Error) {
+        MainActor.assumeIsolated { state = .upToDate(Date()) }
+    }
+
+    nonisolated func updater(_ updater: SPUUpdater, didFinishUpdateCycleFor updateCheck: SPUUpdateCheck, error: Error?) {
+        MainActor.assumeIsolated {
+            guard let error = error as NSError? else { return }
+            switch error.code {
+            case Int(Sparkle.SUError.noUpdateError.rawValue),
+                 Int(Sparkle.SUError.installationCanceledError.rawValue),
+                 Int(Sparkle.SUError.installationAuthorizeLaterError.rawValue):
+                break
+            default:
+                if error.domain == SUSparkleErrorDomain, available == nil { state = .failed }
             }
-            let payload = try JSONDecoder().decode(LatestPayload.self, from: data)
-            let version = payload.tag_name.hasPrefix("v") ? String(payload.tag_name.dropFirst()) : payload.tag_name
-            let summary = payload.body?
-                .components(separatedBy: .newlines)
-                .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "#*- ").union(.whitespaces)) }
-                .first { !$0.isEmpty && !$0.contains("http") }
-            return .success(Release(version: version, url: payload.html_url, summary: summary))
-        } catch {
-            return .failure(error)
         }
     }
 
-    /// Compara "1.2.3" numericamente, componente a componente.
-    nonisolated static func isNewer(_ candidate: String, than current: String) -> Bool {
-        func parts(_ s: String) -> [Int] {
-            s.split(separator: ".").map { Int($0.prefix { $0.isNumber }) ?? 0 }
+    /// Primeira linha de texto das notas (markdown/HTML do appcast → texto).
+    nonisolated private static func summary(of item: SUAppcastItem) -> String? {
+        guard let html = item.itemDescription else { return nil }
+        let text = html.replacingOccurrences(of: "<[^>]+>", with: "\n", options: .regularExpression)
+        return text
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "#*- ").union(.whitespaces)) }
+            .first { !$0.isEmpty && !$0.contains("http") }
+    }
+}
+
+// MARK: - SPUStandardUserDriverDelegate
+
+extension UpdateChecker: SPUStandardUserDriverDelegate {
+    /// Num app sem Dock o Sparkle adiaria o alerta das checagens agendadas até
+    /// o app "voltar ao foco", o que nunca acontece com um acessório. Com isto
+    /// ele mostra o prompt na hora, e a gente traz o app para a frente.
+    nonisolated var supportsGentleScheduledUpdateReminders: Bool { true }
+
+    nonisolated func standardUserDriverShouldHandleShowingScheduledUpdate(_ update: SUAppcastItem,
+                                                                          andInImmediateFocus immediateFocus: Bool) -> Bool {
+        true
+    }
+
+    nonisolated func standardUserDriverWillHandleShowingUpdate(_ handleShowingUpdate: Bool,
+                                                               forUpdate update: SUAppcastItem,
+                                                               state: SPUUserUpdateState) {
+        // O Sparkle cria a janela logo depois deste callback; no ciclo seguinte
+        // ela já existe e dá para trazê-la à frente mesmo sem o app ativo.
+        DispatchQueue.main.async {
+            NSApp.activate()
+            for window in NSApp.windows where !(window is NSPanel) && window.isVisible {
+                window.orderFrontRegardless()
+            }
         }
-        let a = parts(candidate), b = parts(current)
-        for i in 0..<max(a.count, b.count) {
-            let x = i < a.count ? a[i] : 0
-            let y = i < b.count ? b[i] : 0
-            if x != y { return x > y }
-        }
-        return false
     }
 }

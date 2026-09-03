@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Mesclado com o Info.plist gerado pelo Xcode (GENERATE_INFOPLIST_FILE).
+	     Só as chaves do Sparkle vivem aqui. -->
+	<key>SUFeedURL</key>
+	<string>https://aricarmo.github.io/SwiftSnes/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>TkKvfJkVfteQRhxZche2b62zWQ/W/KfwPD5YL7FhbfI=</string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
+	<!-- Sem isto o Sparkle seguiria a única localização do app (en) em vez do
+	     idioma do usuário; com ele o diálogo sai em pt-BR. -->
+	<key>CFBundleAllowMixedLocalizations</key>
+	<true/>
+	<!-- App sandboxed: a instalação roda no XPC Installer do Sparkle. -->
+	<key>SUEnableInstallerLauncherService</key>
+	<true/>
+</dict>
+</plist>
