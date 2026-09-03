@@ -38,7 +38,7 @@ fi
 if [[ "${1:-}" != "--skip-build" ]]; then
   xcodebuild -project NotchSnes.xcodeproj -scheme NotchSnes -configuration Release \
     -derivedDataPath "$DERIVED" \
-    CODE_SIGN_IDENTITY="$IDENTITY" CODE_SIGNING_ALLOWED=YES "${SIGN_FLAGS[@]}" \
+    CODE_SIGN_IDENTITY="$IDENTITY" CODE_SIGNING_ALLOWED=YES ${SIGN_FLAGS[@]+"${SIGN_FLAGS[@]}"} \
     ${VERSION:+MARKETING_VERSION="$VERSION"} CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
     build | tail -3
 fi

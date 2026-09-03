@@ -1,0 +1,17 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>NotchSnes</title>
+        <item>
+            <title>2.0</title>
+            <pubDate>Thu, 03 Sep 2026 17:29:31 -0300</pubDate>
+            <link>https://aricarmo.github.io/SwiftSnes/</link>
+            <sparkle:fullReleaseNotesLink>https://github.com/aricarmo/SwiftSnes/releases/tag/v2.0</sparkle:fullReleaseNotesLink>
+            <sparkle:version>39</sparkle:version>
+            <sparkle:shortVersionString>2.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.4</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/aricarmo/SwiftSnes/releases/download/v2.0/NotchSnes.dmg" length="14071465" type="application/octet-stream" sparkle:edSignature="9Vzn+RJQDJKkyWsacI34xrijl9NtkPTw5sU5JZGRMwWOFdT9+35JvKSvssBPeJNuXVjBD/nM1lbP5lZ3eRVJAA=="/>
+        </item>
+    </channel>
+</rss>
