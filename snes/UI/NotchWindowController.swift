@@ -36,6 +36,7 @@ final class NotchWindowController {
     private let bindings = KeyBindings.shared
     private let padBindings = GamepadBindings.shared
     private let gamepad = GamepadInput()
+    private let library = GameLibrary(recents: RecentROMs.shared, folder: ROMFolder.shared)
 
     private var hoverMonitor: NotchHoverMonitor?
     private var keyMonitor: Any?
@@ -61,9 +62,9 @@ final class NotchWindowController {
     private var screen: NSScreen { NotchMetrics.preferredScreen() }
     private var panelWidth: CGFloat { NotchMetrics.panelWidth(on: screen) }
     private var headerHeight: CGFloat { NotchMetrics.headerHeight(on: screen) }
-    /// Largura máxima do painel (corpo com o jogo). A janela é sempre desse
+    /// Largura máxima do painel (jogo ou biblioteca). A janela é sempre desse
     /// tamanho; o conteúdo mais estreito fica centralizado nela.
-    private var bodyWidth: CGFloat { NotchMetrics.bodyWidth(panelWidth: panelWidth, size: settings.screenSize) }
+    private var bodyWidth: CGFloat { NotchMetrics.windowWidth(panelWidth: panelWidth, size: settings.screenSize) }
 
     init(viewModel: EmulatorViewModel) {
         self.viewModel = viewModel
@@ -72,7 +73,7 @@ final class NotchWindowController {
         let currentScreen = NotchMetrics.preferredScreen()
         let width = NotchMetrics.panelWidth(on: currentScreen)
         let header = NotchMetrics.headerHeight(on: currentScreen)
-        let body = NotchMetrics.bodyWidth(panelWidth: width, size: settings.screenSize)
+        let body = NotchMetrics.windowWidth(panelWidth: width, size: settings.screenSize)
 
         let root = NotchRootView(
             vm: viewModel,
@@ -82,6 +83,7 @@ final class NotchWindowController {
             padBindings: padBindings,
             gamepad: gamepad,
             recents: RecentROMs.shared,
+            library: library,
             updater: UpdateChecker.shared,
             panelWidth: width,
             headerHeight: header,
@@ -147,6 +149,17 @@ final class NotchWindowController {
         installOutsideClickMonitor()
         installHotKey()
         observeGamepad()
+        library.onOpen = { [weak self] item in
+            switch item.source {
+            case .recent(let entry): self?.viewModel.loadRecent(entry)
+            case .file(let url): self?.viewModel.loadROM(from: url)
+            }
+        }
+    }
+
+    /// Biblioteca na tela: sem ROM, com recentes, fora dos ajustes.
+    private var showsLibrary: Bool {
+        !viewModel.isROMLoaded && !presenter.showsSettings && !library.items.isEmpty
     }
 
     func show() {
@@ -308,6 +321,7 @@ final class NotchWindowController {
             // Novo console: reenvia o que já está pressionado (teclado ou controle).
             pushJoypad()
         }
+        if viewModel.isROMLoaded && !hadROM { library.padReleased() }
         hadROM = viewModel.isROMLoaded
         // Só atribui quando muda: @Published notifica mesmo com valor igual,
         // e a notificação volta para cá em laço.
@@ -448,9 +462,17 @@ final class NotchWindowController {
 
     private func observeGamepad() {
         // Direto no evento, sem passar por Combine/SwiftUI: latência mínima.
-        gamepad.onPressedChange = { [weak self] _ in
+        gamepad.onPressedChange = { [weak self] mask in
             guard let self, presenter.rebindingPadButton == nil, !presenter.showsSettings else { return }
+            if showsLibrary {
+                library.padChanged(mask)
+                return
+            }
             pushJoypad()
+        }
+        gamepad.onRightStick = { [weak self] x, y in
+            guard let self, showsLibrary else { return }
+            library.setTilt(x: x, y: y)
         }
         gamepad.onRewindPressed = { [weak self] in
             guard let self, presenter.rebindingPadButton == nil, !presenter.showsSettings,
@@ -504,6 +526,11 @@ final class NotchWindowController {
     private func installClickMonitor() {
         clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] event in
             guard let self else { return event }
+            // Na biblioteca o clique torna o painel key (sem ativar o app):
+            // é o que faz as setas do teclado chegarem ao carrossel.
+            if event.window === panel, showsLibrary, hotRect.contains(NSEvent.mouseLocation), !panel.isKeyWindow {
+                panel.makeKey()
+            }
             guard event.window === panel, !presenter.isOpen,
                   hotRect.contains(NSEvent.mouseLocation) else {
                 // O monitor global não vê eventos do nosso próprio app: um
@@ -575,6 +602,10 @@ final class NotchWindowController {
             return handleRewindKey(event)
         }
 
+        if showsLibrary, presenter.rebindingPadButton == nil {
+            return handleLibraryKey(event)
+        }
+
         if event.type == .keyDown && event.keyCode == UInt16(kVK_Escape) {
             if presenter.rebindingPadButton != nil {
                 presenter.rebindingPadButton = nil
@@ -600,6 +631,25 @@ final class NotchWindowController {
             pressedButtons &= ~button.mask
         }
         pushJoypad()
+        return nil
+    }
+
+    /// Setas navegam o carrossel; Return/Espaço abrem; ⌘O abre o seletor.
+    /// As demais teclas seguem para o app.
+    private func handleLibraryKey(_ event: NSEvent) -> NSEvent? {
+        let code = Int(event.keyCode)
+        let navigation = [kVK_LeftArrow, kVK_RightArrow, kVK_Return, kVK_ANSI_KeypadEnter, kVK_Space]
+        if event.type == .keyDown, event.modifierFlags.contains(.command), code == kVK_ANSI_O {
+            viewModel.showFileDialog()
+            return nil
+        }
+        guard navigation.contains(code) else { return event }
+        guard event.type == .keyDown else { return nil }
+        switch code {
+        case kVK_LeftArrow: library.move(-1)
+        case kVK_RightArrow: library.move(1)
+        default: if !event.isARepeat { library.openSelected() }
+        }
         return nil
     }
 

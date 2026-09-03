@@ -31,6 +31,11 @@ enum NotchMetrics {
 
     static let emptyDropHeight: CGFloat = 148
 
+    /// Biblioteca (carrossel de cartuchos): mesma largura do vídeo "Grande",
+    /// para três cartuchos caberem lado a lado com folga.
+    static let libraryBodyWidth: CGFloat = 664
+    static let libraryCarouselHeight: CGFloat = 236
+
     /// Miniatura do tamanho de tela nos ajustes: largura do corpo interpola
     /// entre o vídeo compacto (356 pt) e o cinema (768 pt).
     static let sizeGlyphMinWidth: CGFloat = 26
@@ -111,5 +116,11 @@ enum NotchMetrics {
     /// Largura do corpo com o jogo aberto: nunca menor que a faixa do notch.
     static func bodyWidth(panelWidth: CGFloat, size: ScreenSize) -> CGFloat {
         max(panelWidth, videoSize(panelWidth: panelWidth, size: size).width + contentPadding * 2)
+    }
+
+    /// Largura da janela: o maior corpo possível (jogo ou biblioteca). O
+    /// conteúdo mais estreito fica centralizado nela.
+    static func windowWidth(panelWidth: CGFloat, size: ScreenSize) -> CGFloat {
+        max(bodyWidth(panelWidth: panelWidth, size: size), libraryBodyWidth)
     }
 }

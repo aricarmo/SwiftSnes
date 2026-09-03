@@ -14,12 +14,18 @@ final class RecentROMs: ObservableObject {
         let openedAt: Date
         let bookmark: Data
 
+        /// Título do header vem em caixa alta; para exibir, capitaliza.
+        var displayName: String {
+            name == name.uppercased() ? name.capitalized : name
+        }
+
         var relativeDescription: String {
             Self.relativeFormatter.localizedString(for: openedAt, relativeTo: Date())
         }
 
         private static let relativeFormatter: RelativeDateTimeFormatter = {
             let formatter = RelativeDateTimeFormatter()
+            formatter.locale = Locale(identifier: "pt_BR")
             formatter.unitsStyle = .short
             return formatter
         }()
@@ -28,7 +34,7 @@ final class RecentROMs: ObservableObject {
     @Published private(set) var entries: [Entry] = []
 
     private let defaultsKey = "notch.recentROMs"
-    private let limit = 4
+    private let limit = 10
 
     private init() { load() }
 

@@ -174,6 +174,9 @@ final class GamepadInput: ObservableObject {
     var onPressedChange: ((UInt16) -> Void)?
     /// Botão de voltar no tempo acabou de ser pressionado (borda de subida).
     var onRewindPressed: (() -> Void)?
+    /// Stick direito (x, y em -1...1), fora do @Published pelo mesmo motivo da máscara.
+    var onRightStick: ((Float, Float) -> Void)?
+    private var rightStick: (Float, Float) = (0, 0)
     private var rewindHeld = false
     /// Nível de bateria 0...1, se o controle informar.
     @Published private(set) var batteryLevel: Float?
@@ -293,6 +296,12 @@ final class GamepadInput: ObservableObject {
         // Só publica se mudou: @Published notifica mesmo com valor igual.
         let level = controller?.battery?.batteryLevel
         if level != batteryLevel { batteryLevel = level }
+
+        let stick = (pad.rightThumbstick.xAxis.value, pad.rightThumbstick.yAxis.value)
+        if stick != rightStick {
+            rightStick = stick
+            onRightStick?(stick.0, stick.1)
+        }
 
         var mask: UInt16 = 0
         var rewindNow = false

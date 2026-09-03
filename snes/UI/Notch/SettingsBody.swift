@@ -17,8 +17,10 @@ struct SettingsBody: View {
     @ObservedObject var padBindings: GamepadBindings
     @ObservedObject var gamepad: GamepadInput
     @ObservedObject var updater: UpdateChecker
+    @ObservedObject private var folder = ROMFolder.shared
 
     let panelWidth: CGFloat
+    let onChooseFolder: () -> Void
     let onQuit: () -> Void
 
     @State private var source: InputSource = .keyboard
@@ -87,6 +89,10 @@ struct SettingsBody: View {
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            Divider().overlay(NotchPalette.divider)
+            SectionLabel("JOGOS")
+            ROMFolderRow(folder: folder, onChoose: onChooseFolder, onClear: folder.clear)
 
             Divider().overlay(NotchPalette.divider)
             SectionLabel("COMPORTAMENTO")
@@ -191,6 +197,57 @@ private struct SourcePicker: View {
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(Color.white.opacity(0.06))
+        )
+    }
+}
+
+/// Pasta padrão de ROMs: caminho atual, escolher e remover.
+private struct ROMFolderRow: View {
+    @ObservedObject var folder: ROMFolder
+    let onChoose: () -> Void
+    let onClear: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "folder")
+                .font(.system(size: 11))
+                .foregroundStyle(folder.url != nil ? NotchPalette.accentSoft : Color.white.opacity(0.3))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(folder.displayPath ?? "Nenhuma pasta de ROMs")
+                    .font(.system(size: 12))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .foregroundStyle(NotchPalette.primaryText.opacity(folder.url != nil ? 0.85 : 0.45))
+                Text(folder.url != nil
+                     ? "\(folder.files.count) jogos · recentes primeiro, depois A–Z"
+                     : "Os jogos dela entram na biblioteca")
+                    .font(.system(size: 10))
+                    .foregroundStyle(NotchPalette.primaryText.opacity(0.35))
+            }
+            Spacer(minLength: 6)
+            Button(folder.url == nil ? "Escolher…" : "Trocar…", action: onChoose)
+                .buttonStyle(.plain)
+                .font(.system(size: 11))
+                .foregroundStyle(NotchPalette.accentBright)
+            if folder.url != nil {
+                Button(action: onClear) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(NotchPalette.primaryText.opacity(0.35))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 36)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(folder.url != nil ? Color.white.opacity(0.05) : .clear)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(folder.url != nil ? .clear : Color.white.opacity(0.12),
+                              style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
         )
     }
 }

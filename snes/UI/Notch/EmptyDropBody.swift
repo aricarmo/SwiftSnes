@@ -1,11 +1,12 @@
 //  EmptyDropBody.swift
-//  Corpo do painel sem ROM: área de drop, recentes e erro de carregamento.
+//  Corpo do painel sem ROM nem recentes: área de drop e erro de carregamento.
+//  Com recentes, o painel mostra a `LibraryBody`.
 
 import SwiftUI
 
 struct EmptyDropBody: View {
     @ObservedObject var vm: EmulatorViewModel
-    @ObservedObject var recents: RecentROMs
+    @ObservedObject var presenter: NotchPresenter
     @ObservedObject var updater: UpdateChecker
 
     let panelWidth: CGFloat
@@ -18,9 +19,27 @@ struct EmptyDropBody: View {
 
             DropZone(action: vm.showFileDialog)
 
-            if !recents.entries.isEmpty {
-                RecentROMsList(entries: recents.entries, onOpen: vm.loadRecent)
+            Button(action: vm.showFolderDialog) {
+                HStack(spacing: 7) {
+                    Image(systemName: "folder")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(NotchPalette.accentSoft)
+                    Text("Escolher a pasta das suas ROMs…")
+                        .font(.system(size: 12))
+                        .foregroundStyle(NotchPalette.primaryText.opacity(0.85))
+                    Spacer()
+                    Text("vira a biblioteca")
+                        .font(.system(size: 9.5))
+                        .foregroundStyle(NotchPalette.primaryText.opacity(0.35))
+                }
+                .padding(.horizontal, 9)
+                .frame(height: 28)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.white.opacity(0.055))
+                )
             }
+            .buttonStyle(.plain)
 
             if let error = vm.errorText {
                 Text(error)
@@ -35,7 +54,7 @@ struct EmptyDropBody: View {
     }
 }
 
-private struct UpdateAvailableRow: View {
+struct UpdateAvailableRow: View {
     let version: String
     let action: () -> Void
 
@@ -95,40 +114,6 @@ private struct DropZone: View {
             )
             .frame(height: NotchMetrics.emptyDropHeight)
             .onTapGesture(perform: action)
-    }
-}
-
-private struct RecentROMsList: View {
-    let entries: [RecentROMs.Entry]
-    let onOpen: (RecentROMs.Entry) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            SectionLabel("RECENTES")
-            ForEach(entries) { entry in
-                Button {
-                    onOpen(entry)
-                } label: {
-                    HStack {
-                        Text(entry.name)
-                            .font(.system(size: 12))
-                            .lineLimit(1)
-                            .foregroundStyle(NotchPalette.primaryText.opacity(0.85))
-                        Spacer()
-                        Text(entry.relativeDescription)
-                            .font(.system(size: 9.5))
-                            .foregroundStyle(NotchPalette.primaryText.opacity(0.35))
-                    }
-                    .padding(.horizontal, 9)
-                    .frame(height: 28)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color.white.opacity(0.055))
-                    )
-                }
-                .buttonStyle(.plain)
-            }
-        }
     }
 }
 

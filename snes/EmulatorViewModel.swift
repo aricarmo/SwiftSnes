@@ -119,6 +119,27 @@ final class EmulatorViewModel: ObservableObject {
         }
     }
 
+    /// Pasta padrão de ROMs (ajustes): alimenta a biblioteca.
+    func showFolderDialog() {
+        NSApp.activate(ignoringOtherApps: true)
+        isPresentingDialog = true
+
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.title = "Escolha a pasta das suas ROMs"
+        panel.prompt = "Usar pasta"
+
+        panel.begin { [weak self] response in
+            guard let self else { return }
+            isPresentingDialog = false
+            if response == .OK, let url = panel.url {
+                ROMFolder.shared.set(url)
+            }
+        }
+    }
+
     func loadROM(from url: URL) {
         // A ROM pode estar fora do sandbox; garante o acesso concedido pelo painel ou pelo drop.
         let scoped = url.startAccessingSecurityScopedResource()
@@ -158,6 +179,19 @@ final class EmulatorViewModel: ObservableObject {
             errorText = "Erro ao carregar ROM: \(error.localizedDescription)"
             isROMLoaded = false
         }
+    }
+
+    /// Volta à biblioteca: salva o progresso e descarrega a ROM.
+    func ejectROM() {
+        guard isROMLoaded else { return }
+        saveSRAMIfNeeded()
+        suspendEmulation()
+        isROMLoaded = false
+        isRunning = false
+        rewind = nil
+        history.clear()
+        romTitle = ""
+        errorText = nil
     }
 
     func loadRecent(_ entry: RecentROMs.Entry) {

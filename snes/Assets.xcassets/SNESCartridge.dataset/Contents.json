@@ -1,0 +1,12 @@
+{
+  "data" : [
+    {
+      "filename" : "snes_cartridge.glb",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

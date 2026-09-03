@@ -65,23 +65,16 @@ private struct NotchHeaderLeading: View {
             }
             .buttonStyle(.plain)
         } else {
+            // Sem ROM o painel é a biblioteca: ícone do app girando e o nome
+            // do app, como o título do jogo quando há um rodando.
             HStack(spacing: 7) {
-                if vm.isROMLoaded {
-                    SpinningAppIcon()
-                } else {
-                    Image("CartridgeGlyph")
-                        .renderingMode(.template)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 13, height: 13)
-                        .foregroundStyle(Color.white.opacity(0.4))
-                }
-                Text(vm.isROMLoaded ? vm.shortTitle : "SNES")
+                SpinningAppIcon()
+                Text(vm.isROMLoaded ? vm.shortTitle : "NotchSnes")
                     .font(.system(size: 10.5))
                     .kerning(0.6)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                    .foregroundStyle(NotchPalette.primaryText.opacity(vm.isROMLoaded ? 0.86 : 0.45))
+                    .foregroundStyle(NotchPalette.primaryText.opacity(0.86))
             }
         }
     }

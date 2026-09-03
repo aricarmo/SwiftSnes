@@ -86,3 +86,8 @@ Logs: `log stream --predicate 'subsystem == "com.ari.NotchSnes"'`.
 ## License
 
 To be defined.
+
+## Créditos
+
+- Modelo 3D do cartucho: [SNES Cartridge](https://sketchfab.com/3d-models/snes-cartridge-1caba5630eb0435187d6e975d4eed6c5) por Steven-Bennis, licença CC-BY-4.0.
+- Capas dos jogos: [libretro-thumbnails](https://github.com/libretro-thumbnails/libretro-thumbnails), baixadas sob demanda.

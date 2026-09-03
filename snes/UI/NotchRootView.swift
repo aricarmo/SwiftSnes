@@ -12,6 +12,7 @@ struct NotchRootView: View {
     @ObservedObject var padBindings: GamepadBindings
     @ObservedObject var gamepad: GamepadInput
     @ObservedObject var recents: RecentROMs
+    @ObservedObject var library: GameLibrary
     @ObservedObject var updater: UpdateChecker
 
     let panelWidth: CGFloat
@@ -31,14 +32,22 @@ struct NotchRootView: View {
     private var videoSize: CGSize {
         NotchMetrics.videoSize(panelWidth: panelWidth, size: settings.screenSize)
     }
-    /// Largura máxima do painel (corpo com o jogo). É a largura da janela.
+    /// Largura do corpo com o jogo.
     private var bodyWidth: CGFloat {
         NotchMetrics.bodyWidth(panelWidth: panelWidth, size: settings.screenSize)
     }
-    /// Largura do corpo exibido agora: só o jogo alarga; vazio e ajustes ficam
-    /// na largura da faixa do notch.
+    /// Largura máxima do painel (jogo ou biblioteca). É a largura da janela.
+    private var windowWidth: CGFloat {
+        NotchMetrics.windowWidth(panelWidth: panelWidth, size: settings.screenSize)
+    }
+    /// Sem ROM e com jogos recentes, o corpo é o carrossel.
+    private var showsLibrary: Bool { !vm.isROMLoaded && !library.items.isEmpty }
+    /// Largura do corpo exibido agora: jogo e biblioteca alargam; vazio e
+    /// ajustes ficam na largura da faixa do notch.
     private var currentBodyWidth: CGFloat {
-        (presenter.showsSettings || !vm.isROMLoaded) ? panelWidth : bodyWidth
+        if presenter.showsSettings { return panelWidth }
+        if vm.isROMLoaded { return bodyWidth }
+        return showsLibrary ? NotchMetrics.libraryBodyWidth : panelWidth
     }
     /// Largura da faixa exibida agora: recolhida, cobre só o entalhe físico
     /// (em Macs sem notch não há entalhe, então fica na largura do painel);
@@ -58,7 +67,7 @@ struct NotchRootView: View {
 
     init(vm: EmulatorViewModel, presenter: NotchPresenter, settings: NotchSettings,
          bindings: KeyBindings, padBindings: GamepadBindings, gamepad: GamepadInput,
-         recents: RecentROMs, updater: UpdateChecker,
+         recents: RecentROMs, library: GameLibrary, updater: UpdateChecker,
          panelWidth: CGFloat, headerHeight: CGFloat, notchGap: CGFloat,
          onQuit: @escaping () -> Void) {
         self.vm = vm
@@ -68,6 +77,7 @@ struct NotchRootView: View {
         self.padBindings = padBindings
         self.gamepad = gamepad
         self.recents = recents
+        self.library = library
         self.updater = updater
         self.panelWidth = panelWidth
         self.headerHeight = headerHeight
@@ -98,7 +108,7 @@ struct NotchRootView: View {
                                   shape: shape,
                                   heightAnimation: heightAnimation,
                                   widthAnimation: widthAnimation,
-                                  bodyWidth: bodyWidth,
+                                  bodyWidth: windowWidth,
                                   naturalHeight: naturalHeight,
                                   visibleHeight: visibleHeight,
                                   currentBodyWidth: currentBodyWidth,
@@ -125,19 +135,23 @@ struct NotchRootView: View {
                 if presenter.showsSettings {
                     SettingsBody(presenter: presenter, settings: settings, bindings: bindings,
                                  padBindings: padBindings, gamepad: gamepad, updater: updater,
-                                 panelWidth: panelWidth, onQuit: onQuit)
+                                 panelWidth: panelWidth, onChooseFolder: vm.showFolderDialog, onQuit: onQuit)
                         .transition(.opacity)
                 } else if vm.isROMLoaded {
                     GameBody(vm: vm, presenter: presenter, gamepad: gamepad,
                              videoSize: videoSize, filter: settings.screenFilter)
                         .transition(.opacity)
+                } else if showsLibrary {
+                    LibraryBody(vm: vm, library: library, gamepad: gamepad, updater: updater,
+                                bodyWidth: NotchMetrics.libraryBodyWidth)
+                        .transition(.opacity)
                 } else {
-                    EmptyDropBody(vm: vm, recents: recents, updater: updater, panelWidth: panelWidth)
+                    EmptyDropBody(vm: vm, presenter: presenter, updater: updater, panelWidth: panelWidth)
                         .transition(.opacity)
                 }
             }
         }
-        .frame(width: bodyWidth, alignment: .top)
+        .frame(width: windowWidth, alignment: .top)
         // Fundo sobra de cada lado para as orelhas do topo da faixa.
         .padding(.horizontal, NotchMetrics.topFlareRadius)
         .background(NotchPalette.panel)
@@ -147,6 +161,9 @@ struct NotchRootView: View {
     private func contextMenuItems() -> some View {
         Button(presenter.isPinned ? "Soltar painel" : "Fixar painel", action: presenter.togglePin)
         Button("Carregar ROM…", action: vm.showFileDialog)
+        if vm.isROMLoaded {
+            Button("Voltar à biblioteca", action: vm.ejectROM)
+        }
         Divider()
         Button("Sair", action: onQuit)
     }
