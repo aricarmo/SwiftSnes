@@ -19,6 +19,11 @@ enum NotchMetrics {
     static let minPanelWidth: CGFloat = 380
     /// Raio dos ombros onde o corpo, mais largo, sai de baixo da faixa do notch.
     static let shoulderRadius: CGFloat = 14
+    /// Raio das orelhas côncavas onde o topo da faixa encosta na borda da tela,
+    /// como o entalhe físico. Sem elas o painel parece uma lingueta colada.
+    static let topFlareRadius: CGFloat = 20
+    /// Mesmas orelhas na pílula recolhida, bem menores.
+    static let pillFlareRadius: CGFloat = 6
 
     /// Margem da janela em volta do painel, para a sombra não ser recortada.
     static let shadowMargin: CGFloat = 44
@@ -47,6 +52,18 @@ enum NotchMetrics {
     static var contentAnimation: Animation {
         .timingCurve(0.22, 1, 0.36, 1, duration: expandDuration)
     }
+    /// Abrir e fechar em duas etapas: a faixa alarga e só então o corpo desce;
+    /// ao fechar o corpo sobe e só então a faixa estreita.
+    static let widthDuration: TimeInterval = 0.3
+    static var widthAnimation: Animation {
+        .timingCurve(0.22, 1, 0.36, 1, duration: widthDuration)
+    }
+    /// Quanto esperar antes da segunda etapa: easeOutQuint já está
+    /// praticamente assentado bem antes do fim, e as etapas se sobrepõem.
+    static let expandHeightDelay: TimeInterval = widthDuration * 0.4
+    static let collapseWidthDelay: TimeInterval = expandDuration * 0.7
+    /// Tempo total de abrir (largura + altura) ou fechar (altura + largura).
+    static let totalDuration: TimeInterval = widthDuration + expandDuration
 
     /// Tela que tem o entalhe; se nenhuma tiver, a principal.
     static func preferredScreen() -> NSScreen {

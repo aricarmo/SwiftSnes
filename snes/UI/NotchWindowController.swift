@@ -238,7 +238,7 @@ final class NotchWindowController {
             }
         }
         shrinkWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + NotchMetrics.expandDuration + 0.02,
+        DispatchQueue.main.asyncAfter(deadline: .now() + NotchMetrics.totalDuration + 0.02,
                                       execute: work)
     }
 
@@ -337,7 +337,7 @@ final class NotchWindowController {
             }
         }
         resumeWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + NotchMetrics.expandDuration + 0.05,
+        DispatchQueue.main.asyncAfter(deadline: .now() + NotchMetrics.totalDuration + 0.05,
                                       execute: work)
     }
 

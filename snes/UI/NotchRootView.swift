@@ -42,9 +42,13 @@ struct NotchRootView: View {
     }
     /// Largura da faixa exibida agora: recolhida, cobre só o entalhe físico
     /// (em Macs sem notch não há entalhe, então fica na largura do painel);
-    /// com o cursor em cima ou aberta, alarga para caber título e FPS.
+    /// com o cursor em cima alarga para caber título e FPS, e aberta acompanha
+    /// o corpo, sem ombros.
     private var currentHeaderWidth: CGFloat {
-        presenter.showsHeader ? panelWidth : NotchMetrics.collapsedWidth(panelWidth: panelWidth, notchGap: notchGap)
+        if presenter.isOpen { return currentBodyWidth }
+        return presenter.showsHeader
+            ? panelWidth
+            : NotchMetrics.collapsedWidth(panelWidth: panelWidth, notchGap: notchGap)
     }
     /// Faixa do notch em cima, corpo (possivelmente mais largo) embaixo.
     private var shape: NotchPanelShape {
@@ -71,11 +75,29 @@ struct NotchRootView: View {
         self.onQuit = onQuit
     }
 
+    /// Abrir em duas etapas: a faixa alarga primeiro e o corpo só desce depois.
+    private var heightAnimation: Animation {
+        presenter.isOpen
+            ? NotchMetrics.contentAnimation.delay(NotchMetrics.expandHeightDelay)
+            : NotchMetrics.contentAnimation
+    }
+    /// Fechar é o inverso: enquanto o corpo ainda está descido (a máscara só
+    /// muda no ciclo seguinte), a faixa espera ele subir antes de estreitar.
+    /// No hover, sem corpo, alarga e estreita na hora.
+    private var widthAnimation: Animation {
+        let closing = !presenter.isOpen && visibleHeight > headerHeight + 0.5
+        return closing
+            ? NotchMetrics.widthAnimation.delay(NotchMetrics.collapseWidthDelay)
+            : NotchMetrics.widthAnimation
+    }
+
     var body: some View {
         // Árvore estável: a cópia de medição só deixa de aplicar o recorte.
         panelContent
             .modifier(PanelChrome(enabled: !measuring,
                                   shape: shape,
+                                  heightAnimation: heightAnimation,
+                                  widthAnimation: widthAnimation,
                                   bodyWidth: bodyWidth,
                                   naturalHeight: naturalHeight,
                                   visibleHeight: visibleHeight,
@@ -89,8 +111,10 @@ struct NotchRootView: View {
 
     private var panelContent: some View {
         VStack(spacing: 0) {
+            // Aberto, título e FPS se espalham pela largura do corpo.
             NotchHeader(vm: vm, presenter: presenter, gamepad: gamepad, updater: updater,
-                        panelWidth: panelWidth, headerHeight: headerHeight, notchGap: notchGap)
+                        panelWidth: presenter.isOpen ? currentBodyWidth : panelWidth,
+                        headerHeight: headerHeight, notchGap: notchGap)
             // ZStack e não o if/else solto no VStack: enquanto a troca de corpo
             // anima, o SwiftUI mantém a view que sai ocupando lugar no layout.
             // Empilhadas, as duas somariam altura, a pilha estouraria a moldura
@@ -114,6 +138,8 @@ struct NotchRootView: View {
             }
         }
         .frame(width: bodyWidth, alignment: .top)
+        // Fundo sobra de cada lado para as orelhas do topo da faixa.
+        .padding(.horizontal, NotchMetrics.topFlareRadius)
         .background(NotchPalette.panel)
     }
 
@@ -146,6 +172,8 @@ struct NotchRootView: View {
 private struct PanelChrome<Menu: View>: ViewModifier {
     let enabled: Bool
     let shape: NotchPanelShape
+    let heightAnimation: Animation
+    let widthAnimation: Animation
     let bodyWidth: CGFloat
     let naturalHeight: CGFloat
     let visibleHeight: CGFloat
@@ -157,29 +185,33 @@ private struct PanelChrome<Menu: View>: ViewModifier {
     @ViewBuilder let contextMenu: () -> Menu
 
     func body(content: Content) -> some View {
+        // Largura do conteúdo com a folga das orelhas de cada lado.
+        let flare = NotchMetrics.topFlareRadius
+        let width = bodyWidth + flare * 2
         if enabled {
             content
                 // Altura constante: animar layout faria o conteúdo crescer do
                 // centro. Só a máscara muda, e ela cresce a partir do topo.
                 .frame(height: naturalHeight, alignment: .top)
                 .mask(alignment: .top) {
-                    shape.frame(width: bodyWidth, height: visibleHeight)
+                    shape.frame(width: width, height: visibleHeight)
                 }
-                .animation(NotchMetrics.contentAnimation, value: visibleHeight)
+                .animation(heightAnimation, value: visibleHeight)
                 .animation(NotchMetrics.contentAnimation, value: currentBodyWidth)
-                .animation(.easeInOut(duration: 0.25), value: currentHeaderWidth)
+                .animation(widthAnimation, value: currentHeaderWidth)
                 // Sombra desenhada aqui (a nativa traria o hairline da janela).
                 // Duas camadas: uma justa e escura, outra ampla e difusa.
                 .shadow(color: .black.opacity(showsShadow ? 0.45 : 0), radius: 6, y: 3)
                 .shadow(color: .black.opacity(showsShadow ? 0.4 : 0), radius: NotchMetrics.shadowRadius, y: 8)
                 .animation(.easeInOut(duration: 0.35), value: showsShadow)
-                .contentShape(shape.path(in: CGRect(x: 0, y: 0, width: bodyWidth,
+                .contentShape(shape.path(in: CGRect(x: 0, y: 0, width: width,
                                                     height: max(1, visibleHeight))))
                 .onTapGesture(perform: onTap)
                 .onDrop(of: [.fileURL], isTargeted: nil, perform: onDrop)
                 .contextMenu(menuItems: contextMenu)
-                // Margem da janela reservada para a sombra.
-                .padding(.horizontal, NotchMetrics.shadowMargin)
+                // Margem da janela reservada para a sombra (a folga das orelhas
+                // já está no conteúdo; a janela continua com `shadowMargin`).
+                .padding(.horizontal, NotchMetrics.shadowMargin - flare)
                 .padding(.bottom, NotchMetrics.shadowMargin)
                 // A janela é menor que o conteúdo enquanto ele está recolhido:
                 // sem isso o painel ficaria centralizado nela em vez de colar no topo.
