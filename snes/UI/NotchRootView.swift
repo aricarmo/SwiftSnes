@@ -14,6 +14,7 @@ struct NotchRootView: View {
     @ObservedObject var recents: RecentROMs
     @ObservedObject var library: GameLibrary
     @ObservedObject var updater: UpdateChecker
+    @ObservedObject var online: OnlineSession
 
     let panelWidth: CGFloat
     let headerHeight: CGFloat
@@ -41,12 +42,12 @@ struct NotchRootView: View {
         NotchMetrics.windowWidth(panelWidth: panelWidth, size: settings.screenSize)
     }
     /// Sem ROM e com jogos recentes, o corpo é o carrossel.
-    private var showsLibrary: Bool { !vm.isROMLoaded && !library.items.isEmpty }
+    private var showsLibrary: Bool { !vm.showsGame && !library.items.isEmpty }
     /// Largura do corpo exibido agora: jogo e biblioteca alargam; vazio e
     /// ajustes ficam na largura da faixa do notch.
     private var currentBodyWidth: CGFloat {
         if presenter.showsSettings { return panelWidth }
-        if vm.isROMLoaded { return bodyWidth }
+        if vm.showsGame { return bodyWidth }
         return showsLibrary ? NotchMetrics.libraryBodyWidth : panelWidth
     }
     /// Largura da faixa exibida agora: recolhida, cobre só o entalhe físico
@@ -79,6 +80,7 @@ struct NotchRootView: View {
         self.recents = recents
         self.library = library
         self.updater = updater
+        self.online = vm.online
         self.panelWidth = panelWidth
         self.headerHeight = headerHeight
         self.notchGap = notchGap
@@ -137,8 +139,8 @@ struct NotchRootView: View {
                                  padBindings: padBindings, gamepad: gamepad, updater: updater,
                                  panelWidth: panelWidth, onChooseFolder: vm.showFolderDialog, onQuit: onQuit)
                         .transition(.opacity)
-                } else if vm.isROMLoaded {
-                    GameBody(vm: vm, presenter: presenter, gamepad: gamepad,
+                } else if vm.showsGame {
+                    GameBody(vm: vm, presenter: presenter, gamepad: gamepad, online: online,
                              videoSize: videoSize, filter: settings.screenFilter)
                         .transition(.opacity)
                 } else if showsLibrary {

@@ -136,7 +136,7 @@ final class NotchWindowController {
         panel.acceptsMouseMovedEvents = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
 
-        presenter.hasROM = viewModel.isROMLoaded
+        presenter.hasROM = viewModel.showsGame
         presenter.hasGamepad = gamepad.isConnected
         presenter.isAppActive = NSApp.isActive
 
@@ -159,7 +159,7 @@ final class NotchWindowController {
 
     /// Biblioteca na tela: sem ROM, com recentes, fora dos ajustes.
     private var showsLibrary: Bool {
-        !viewModel.isROMLoaded && !presenter.showsSettings && !library.items.isEmpty
+        !viewModel.showsGame && !presenter.showsSettings && !library.items.isEmpty
     }
 
     func show() {
@@ -277,13 +277,14 @@ final class NotchWindowController {
     private func observeState() {
         // Só o que muda o tamanho ou o estado do painel. Os frames do jogo nem
         // passam por aqui: vão direto ao CALayer via `FrameSource`.
-        Publishers.MergeMany(
+        let triggers: [AnyPublisher<Void, Never>] = [
             viewModel.$isROMLoaded.map { _ in () }.eraseToAnyPublisher(),
             viewModel.$isRunning.map { _ in () }.eraseToAnyPublisher(),
             viewModel.$errorText.map { _ in () }.eraseToAnyPublisher(),
             viewModel.$isPresentingDialog.map { _ in () }.eraseToAnyPublisher(),
             viewModel.$rewind.map { _ in () }.eraseToAnyPublisher(),
             viewModel.$resumeNotice.map { _ in () }.eraseToAnyPublisher(),
+            viewModel.online.objectWillChange.map { _ in () }.eraseToAnyPublisher(),
             presenter.objectWillChange.map { _ in () }.eraseToAnyPublisher(),
             settings.objectWillChange.map { _ in () }.eraseToAnyPublisher(),
             bindings.objectWillChange.map { _ in () }.eraseToAnyPublisher(),
@@ -294,7 +295,8 @@ final class NotchWindowController {
             gamepad.$justConnected.map { _ in () }.eraseToAnyPublisher(),
             RecentROMs.shared.objectWillChange.map { _ in () }.eraseToAnyPublisher(),
             UpdateChecker.shared.objectWillChange.map { _ in () }.eraseToAnyPublisher()
-        )
+        ]
+        Publishers.MergeMany(triggers)
         // `objectWillChange` dispara antes da mutação: adia um ciclo para ler o
         // estado já atualizado.
         .receive(on: DispatchQueue.main)
@@ -314,19 +316,23 @@ final class NotchWindowController {
 
     private func stateChanged() {
         // ROM recém-carregada: já entra fixado, senão o jogo pausaria assim que o cursor saísse.
-        if viewModel.isROMLoaded && !hadROM {
+        let showsGame = viewModel.showsGame
+        if showsGame && !hadROM {
             presenter.isPinned = true
         }
-        if viewModel.isROMLoaded && !hadROM {
+        if showsGame && !hadROM {
             // Novo console: reenvia o que já está pressionado (teclado ou controle).
             pushJoypad()
         }
-        if viewModel.isROMLoaded && !hadROM { library.padReleased() }
-        hadROM = viewModel.isROMLoaded
+        if showsGame && !hadROM { library.padReleased() }
+        hadROM = showsGame
         // Só atribui quando muda: @Published notifica mesmo com valor igual,
         // e a notificação volta para cá em laço.
-        if presenter.hasROM != viewModel.isROMLoaded {
-            presenter.hasROM = viewModel.isROMLoaded
+        if presenter.hasROM != showsGame {
+            presenter.hasROM = showsGame
+        }
+        if presenter.isHosting != viewModel.online.isHosting {
+            presenter.isHosting = viewModel.online.isHosting
         }
         layout(animated: true)
         syncEmulation()
@@ -396,7 +402,12 @@ final class NotchWindowController {
         }
         rewindPadMask = 0
         stopRewindRepeat()
-        viewModel.setJoypad(pressedButtons | gamepad.pressed)
+        let mask = pressedButtons | gamepad.pressed
+        if viewModel.online.isGuest {
+            viewModel.online.sendInput(mask)
+        } else {
+            viewModel.setJoypad(mask)
+        }
     }
 
     // MARK: - Fita de voltar no tempo
@@ -596,6 +607,11 @@ final class NotchWindowController {
             bindings.bind(button, to: event.keyCode)
             presenter.rebindingButton = nil
             return nil
+        }
+
+        // Digitando num campo (código da sessão, nome): o teclado é dele.
+        if panel.firstResponder is NSTextView {
+            return event
         }
 
         if viewModel.rewind != nil, presenter.needsKeyboard, !presenter.showsSettings {

@@ -63,6 +63,19 @@ final class SNES {
         memory.joypadState[index] = state
     }
 
+    /// Multitap na porta 2, para 3–4 jogadores. Os jogos costumam detectá-lo
+    /// no boot: ligar com o jogo rodando pode não surtir efeito até resetar.
+    var multitap: Bool {
+        get { memory.multitapEnabled }
+        set { memory.multitapEnabled = newValue }
+    }
+
+    /// Amostras de áudio de cada frame, para transmissão.
+    var onAudioSamples: ((_ left: [Int16], _ right: [Int16]) -> Void)? {
+        get { apu.onSamples }
+        set { apu.onSamples = newValue }
+    }
+
     // MARK: - Execução
 
     /// Executa até o PPU completar um frame.

@@ -72,7 +72,13 @@ enum NotchMetrics {
 
     /// Tela que tem o entalhe; se nenhuma tiver, a principal.
     static func preferredScreen() -> NSScreen {
-        NSScreen.screens.first { $0.safeAreaInsets.top > 0 }
+        // NOTCH_SCREEN=1 põe o painel na segunda tela: serve para testar duas
+        // cópias do app (anfitrião e convidado) na mesma máquina.
+        if let index = ProcessInfo.processInfo.environment["NOTCH_SCREEN"].flatMap(Int.init),
+           NSScreen.screens.indices.contains(index) {
+            return NSScreen.screens[index]
+        }
+        return NSScreen.screens.first { $0.safeAreaInsets.top > 0 }
             ?? NSScreen.main
             ?? NSScreen.screens[0]
     }

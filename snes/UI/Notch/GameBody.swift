@@ -8,6 +8,7 @@ struct GameBody: View {
     @ObservedObject var vm: EmulatorViewModel
     @ObservedObject var presenter: NotchPresenter
     @ObservedObject var gamepad: GamepadInput
+    @ObservedObject var online: OnlineSession
 
     let videoSize: CGSize
     let filter: ScreenFilter
@@ -19,7 +20,7 @@ struct GameBody: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            ScreenView(source: vm.frameSource, filter: filter,
+            ScreenView(source: online.isGuest ? online.guestFrames : vm.frameSource, filter: filter,
                        osd: osdAlpha > 0
                            ? VolumeOSDRaster.overlay(volume: settings.volume,
                                                      muted: settings.muted,
@@ -54,7 +55,11 @@ struct GameBody: View {
                             onSelect: vm.rewindSelect, onConfirm: vm.rewindConfirm, onCancel: vm.rewindCancel)
             }
 
-            ControlsBar(vm: vm, presenter: presenter, gamepad: gamepad)
+            if online.isHosting || online.isGuest {
+                SessionStrip(online: online, width: videoSize.width)
+            }
+
+            ControlsBar(vm: vm, presenter: presenter, gamepad: gamepad, online: online)
         }
         .padding(.horizontal, NotchMetrics.contentPadding)
         .padding(.top, 6)
@@ -314,31 +319,6 @@ private struct ThumbImage: View {
     }
 }
 
-private struct StripButton: View {
-    let text: String
-    let prominent: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(text)
-                .font(.system(size: 10.5, weight: prominent ? .semibold : .regular))
-                .foregroundStyle(prominent ? NotchPalette.accentBright : NotchPalette.primaryText.opacity(0.7))
-                .padding(.horizontal, 9)
-                .padding(.vertical, 4)
-                .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(prominent ? NotchPalette.accent.opacity(0.28) : Color.white.opacity(0.07))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .strokeBorder(prominent ? NotchPalette.accentSoft.opacity(0.55) : .clear, lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
-    }
-}
-
 // MARK: - Retomada
 
 private struct ResumeNoticeRow: View {
@@ -393,14 +373,22 @@ private struct ControlsBar: View {
     @ObservedObject var vm: EmulatorViewModel
     @ObservedObject var presenter: NotchPresenter
     @ObservedObject var gamepad: GamepadInput
+    @ObservedObject var online: OnlineSession
 
     var body: some View {
         HStack(spacing: 7) {
-            IconButton(symbol: vm.isRunning ? "pause.fill" : "play.fill", prominent: true,
-                       action: vm.togglePlayPause)
-            IconButton(symbol: "arrow.counterclockwise", action: vm.reset)
-            IconButton(symbol: "backward.fill", active: vm.rewind != nil, action: vm.toggleRewind)
-            IconButton(symbol: "folder", action: vm.showFileDialog)
+            if online.isGuest {
+                // Convidado: o console é do anfitrião; sobra só o que é local.
+                IconButton(symbol: "rectangle.portrait.and.arrow.right", action: online.leave)
+            } else {
+                IconButton(symbol: vm.isRunning ? "pause.fill" : "play.fill", prominent: true,
+                           action: vm.togglePlayPause)
+                IconButton(symbol: "arrow.counterclockwise", action: vm.reset)
+                IconButton(symbol: "backward.fill", active: vm.rewind != nil, action: vm.toggleRewind)
+                IconButton(symbol: "folder", action: vm.showFileDialog)
+                IconButton(symbol: "antenna.radiowaves.left.and.right", active: online.isHosting,
+                           action: online.isHosting ? online.stopHosting : vm.startHosting)
+            }
             VolumeControl(settings: NotchSettings.shared)
 
             Spacer(minLength: 0)

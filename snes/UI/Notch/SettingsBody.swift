@@ -95,6 +95,10 @@ struct SettingsBody: View {
             ROMFolderRow(folder: folder, onChoose: onChooseFolder, onClear: folder.clear)
 
             Divider().overlay(NotchPalette.divider)
+            SectionLabel("ONLINE")
+            PlayerNameRow(settings: settings)
+
+            Divider().overlay(NotchPalette.divider)
             SectionLabel("COMPORTAMENTO")
 
             SettingToggleRow(title: "Pausar ao recolher",
@@ -249,6 +253,62 @@ private struct ROMFolderRow: View {
                 .strokeBorder(folder.url != nil ? .clear : Color.white.opacity(0.12),
                               style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
         )
+    }
+}
+
+/// Nome que os outros veem numa sessão online.
+private struct PlayerNameRow: View {
+    @ObservedObject var settings: NotchSettings
+    @State private var draft = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "person")
+                .font(.system(size: 11))
+                .foregroundStyle(NotchPalette.accentSoft)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Seu nome")
+                    .font(.system(size: 12))
+                    .foregroundStyle(NotchPalette.primaryText.opacity(0.85))
+                Text("Como você aparece para quem joga com você")
+                    .font(.system(size: 10))
+                    .foregroundStyle(NotchPalette.primaryText.opacity(0.35))
+            }
+            Spacer(minLength: 6)
+            TextField("Nome", text: $draft)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12))
+                .foregroundStyle(NotchPalette.primaryText)
+                .multilineTextAlignment(.trailing)
+                .focused($focused)
+                .frame(width: 120)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.white.opacity(focused ? 0.1 : 0.06))
+                )
+                .onSubmit { commit() }
+                .onChange(of: focused) { _, isFocused in if !isFocused { commit() } }
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 36)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(Color.white.opacity(0.05))
+        )
+        .onAppear { draft = settings.playerName }
+    }
+
+    private func commit() {
+        let name = String(draft.trimmingCharacters(in: .whitespacesAndNewlines).prefix(16))
+        if name.isEmpty {
+            draft = settings.playerName
+        } else if name != settings.playerName {
+            settings.playerName = name
+            draft = name
+        }
     }
 }
 

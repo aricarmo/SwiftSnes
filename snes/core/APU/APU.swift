@@ -12,6 +12,9 @@ final class APU {
     let spc700 = SPC700()
     let dsp = DSP()
     let audioOutput = AudioOutput()
+    /// Cópia de cada lote de amostras (32 kHz, L/R) para quem quiser
+    /// transmitir o áudio além da saída local. Chamado na thread da emulação.
+    var onSamples: ((_ left: [Int16], _ right: [Int16]) -> Void)?
 
     private var spcCycleDebt = 0.0
     private var dspCycleAccumulator = 0.0
@@ -70,6 +73,7 @@ final class APU {
     func flushAudio() {
         guard !pendingAudioLeft.isEmpty else { return }
         audioOutput.writeSamples(left: pendingAudioLeft, right: pendingAudioRight)
+        onSamples?(pendingAudioLeft, pendingAudioRight)
         pendingAudioLeft.removeAll(keepingCapacity: true)
         pendingAudioRight.removeAll(keepingCapacity: true)
     }

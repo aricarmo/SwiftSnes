@@ -14,4 +14,5 @@ enum Log {
     static let audio = Logger(subsystem: subsystem, category: "audio")
     static let emulator = Logger(subsystem: subsystem, category: "emulator")
     static let saves = Logger(subsystem: subsystem, category: "saves")
+    static let online = Logger(subsystem: subsystem, category: "online")
 }

@@ -55,6 +55,7 @@ final class NotchSettings: ObservableObject {
         static let analogAsDpad = "notch.analogAsDpad"
         static let volume = "notch.volume"
         static let muted = "notch.muted"
+        static let playerName = "notch.playerName"
     }
 
     /// Recolher o painel suspende CPU/PPU/APU.
@@ -100,6 +101,18 @@ final class NotchSettings: ObservableObject {
     /// Volume que a saída de áudio deve aplicar de fato.
     var effectiveVolume: Float { muted ? 0 : Float(volume) }
 
+    /// Nome que os outros veem numa sessão online.
+    @Published var playerName: String {
+        didSet { defaults.set(playerName, forKey: Key.playerName) }
+    }
+
+    /// Primeiro nome da conta do macOS, ou o nome do computador.
+    static var defaultPlayerName: String {
+        let first = NSFullUserName().split(separator: " ").first.map(String.init) ?? ""
+        if !first.isEmpty { return first }
+        return ProcessInfo.processInfo.hostName.split(separator: ".").first.map(String.init) ?? "Jogador"
+    }
+
     /// "Efeito TV antiga": desligado é tela limpa; ligado volta ao último estilo.
     var retroEffectEnabled: Bool {
         get { screenFilter != .clean }
@@ -130,6 +143,8 @@ final class NotchSettings: ObservableObject {
         screenFilter = ScreenFilter(rawValue: defaults.string(forKey: Key.screenFilter) ?? "") ?? .clean
         volume = defaults.double(forKey: Key.volume)
         muted = defaults.bool(forKey: Key.muted)
+        let storedName = defaults.string(forKey: Key.playerName)?.trimmingCharacters(in: .whitespaces) ?? ""
+        playerName = storedName.isEmpty ? Self.defaultPlayerName : storedName
     }
 
     var fadeDuration: TimeInterval { audioFade ? 0.15 : 0 }

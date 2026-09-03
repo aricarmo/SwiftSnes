@@ -49,6 +49,10 @@ final class MemoryBus {
 
     /// Estado dos 4 controles. Formato de $4218: BYsS UDLR AXLR 0000
     var joypadState: [UInt16] = [0, 0, 0, 0]
+    /// Multitap na porta 2: $4017 passa a devolver dois pads por vez (D0/D1),
+    /// escolhidos pelo bit 7 de $4201, e se identifica com D1=1 durante o
+    /// strobe. Sem ele os pads 3 e 4 só existem nas linhas D1 do auto-read.
+    var multitapEnabled = false
     private var joypadLatched: [UInt16] = [0, 0, 0, 0]
     private var joypadStrobe: Bool = false
     private var joypadShift: [Int] = [0, 0, 0, 0]
@@ -466,9 +470,22 @@ final class MemoryBus {
 
     /// Leitura serial manual em $4016/$4017 (1 bit por leitura, MSB primeiro)
     private func readJoypadSerial(_ port: Int) -> UInt8 {
-        let pad = port  // porta 0 -> joypad 1, porta 1 -> joypad 2
-        guard pad < 4 else { return 0 }
+        // Porta 1 -> joypad 1; porta 2 -> joypad 2, ou o multitap.
+        if port == 0 || !multitapEnabled { return serialBit(pad: port) }
+        if joypadStrobe { return serialBit(pad: 1) | 0x02 }
+        let (d0, d1) = multitapPads
+        var value = serialBit(pad: d0)
+        if let d1 { value |= serialBit(pad: d1) << 1 }
+        return value
+    }
 
+    /// Pads do multitap nas linhas D0/D1 da porta 2: $4201.7 alto escolhe os
+    /// pads 2 e 3, baixo os pads 4 e 5. O quinto não existe aqui (linha em 0).
+    private var multitapPads: (Int, Int?) {
+        (wrio & 0x80) != 0 ? (1, 2) : (3, nil)
+    }
+
+    private func serialBit(pad: Int) -> UInt8 {
         let bitIndex = joypadShift[pad]
         var bit: UInt8 = 0
         if bitIndex < 16 {
@@ -489,6 +506,18 @@ final class MemoryBus {
     func performAutoJoypadRead() {
         guard (nmitimen & 0x01) != 0 else { return }
         autoJoypadBusy = true
+        if multitapEnabled {
+            // JOY2/JOY4 são as linhas D0/D1 da porta 2, com o par que $4201.7
+            // seleciona; na porta 1 a linha D1 (JOY3) está solta. Só os pads
+            // clockados ficam com o shift em 16; os outros esperam a leitura manual.
+            let (d0, d1) = multitapPads
+            joypadLatched = [joypadState[0], joypadState[d0], 0, d1.map { joypadState[$0] } ?? 0]
+            for i in 0..<4 { joypadShift[i] = 0 }
+            joypadShift[0] = 16
+            joypadShift[d0] = 16
+            if let d1 { joypadShift[d1] = 16 }
+            return
+        }
         for i in 0..<4 {
             joypadLatched[i] = joypadState[i]
             // O auto-read já clockou os 16 bits do controle: leituras seriais em

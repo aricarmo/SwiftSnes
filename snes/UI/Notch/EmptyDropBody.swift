@@ -41,6 +41,20 @@ struct EmptyDropBody: View {
             }
             .buttonStyle(.plain)
 
+            HStack {
+                Text("Ou entre na sessão de alguém")
+                    .font(.system(size: 11))
+                    .foregroundStyle(NotchPalette.primaryText.opacity(0.5))
+                Spacer()
+                JoinSessionRow(online: vm.online)
+            }
+            .padding(.horizontal, 9)
+            .frame(height: 28)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.white.opacity(0.055))
+            )
+
             if let error = vm.errorText {
                 Text(error)
                     .font(.system(size: 11))

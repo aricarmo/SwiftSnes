@@ -69,7 +69,9 @@ private struct NotchHeaderLeading: View {
             // do app, como o título do jogo quando há um rodando.
             HStack(spacing: 7) {
                 SpinningAppIcon()
-                Text(vm.isROMLoaded ? vm.shortTitle : "NotchSnes")
+                Text(vm.isROMLoaded ? vm.shortTitle
+                     : vm.online.isGuest ? (vm.online.room?.gameTitle ?? "SESSÃO").uppercased()
+                     : "NotchSnes")
                     .font(.system(size: 10.5))
                     .kerning(0.6)
                     .lineLimit(1)
@@ -89,6 +91,15 @@ private struct NotchHeaderTrailing: View {
     @ObservedObject var presenter: NotchPresenter
     @ObservedObject var gamepad: GamepadInput
     @ObservedObject var updater: UpdateChecker
+    @ObservedObject private var online: OnlineSession
+
+    init(vm: EmulatorViewModel, presenter: NotchPresenter, gamepad: GamepadInput, updater: UpdateChecker) {
+        self.vm = vm
+        self.presenter = presenter
+        self.gamepad = gamepad
+        self.updater = updater
+        self.online = vm.online
+    }
 
     /// Lilás enquanto houver update que o usuário ainda não viu nos ajustes.
     private var gearColor: Color {
@@ -96,7 +107,17 @@ private struct NotchHeaderTrailing: View {
     }
 
     var body: some View {
-        if !vm.isROMLoaded {
+        if online.isGuest {
+            HStack(spacing: 6) {
+                Image(systemName: "antenna.radiowaves.left.and.right")
+                    .font(.system(size: 10))
+                    .foregroundStyle(NotchPalette.accentSoft)
+                Text(online.latencyMs.map { "\($0) ms" } ?? "…")
+                    .font(.system(size: 10.5))
+                    .monospacedDigit()
+                    .foregroundStyle(NotchPalette.primaryText.opacity(0.9))
+            }
+        } else if !vm.isROMLoaded {
             Button(action: openSettings) {
                 Image(systemName: "gearshape")
                     .font(.system(size: 11))
@@ -114,6 +135,12 @@ private struct NotchHeaderTrailing: View {
                     .fill(NotchPalette.running)
                     .frame(width: 6, height: 6)
                     .shadow(color: NotchPalette.running.opacity(0.7), radius: 4)
+                if online.isHosting, let room = online.room {
+                    Text("\(room.onlineCount) online")
+                        .font(.system(size: 10.5))
+                        .monospacedDigit()
+                        .foregroundStyle(NotchPalette.accentSoft)
+                }
                 Text("\(Int(vm.fps.rounded())) FPS")
                     .font(.system(size: 10.5))
                     .monospacedDigit()

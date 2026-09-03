@@ -78,6 +78,7 @@ struct LibraryBody: View {
                     HintKey("↩", "jogar")
                 }
                 Spacer()
+                JoinSessionRow(online: vm.online)
                 Button(action: vm.showFileDialog) {
                     HStack(spacing: 5) {
                         Image(systemName: "folder")

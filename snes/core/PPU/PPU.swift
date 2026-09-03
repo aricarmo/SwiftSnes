@@ -1274,6 +1274,11 @@ final class PPU {
         return (r, g, b)
     }
     
+    /// Acesso direto aos pixels RGBA do último frame (256×224×4), sem copiar.
+    func withFrameBuffer<R>(_ body: (UnsafeBufferPointer<UInt8>) throws -> R) rethrows -> R {
+        try frameBuffer.withUnsafeBufferPointer(body)
+    }
+
     func getFrameImage() -> CGImage? {
         let width = 256
         let height = 224

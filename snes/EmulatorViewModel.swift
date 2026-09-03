@@ -44,6 +44,12 @@ final class EmulatorViewModel: ObservableObject {
     /// Frames do PPU. Fora do `@Published` de propósito: ver `ScreenView`.
     let frameSource = FrameSource()
 
+    /// Sessão online (anfitrião ou convidado).
+    let online = OnlineSession()
+
+    /// O painel mostra uma tela de jogo: ROM local ou transmissão de um anfitrião.
+    var showsGame: Bool { isROMLoaded || online.isGuest }
+
     /// Nome curto que cabe ao lado do entalhe.
     var shortTitle: String {
         let cleaned = romTitle.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -91,6 +97,15 @@ final class EmulatorViewModel: ObservableObject {
             .sink { [weak self] volume, muted in
                 self?.snes.audioVolume = muted ? 0 : Float(volume)
             }
+            .store(in: &cancellables)
+
+        // Controles dos convidados entram direto nas portas 2…4 do console.
+        online.onGuestInput = { [weak self] slot, mask in
+            self?.snes.setJoypad(slot, state: mask)
+        }
+        online.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.syncHosting() }
             .store(in: &cancellables)
 
         if let path = ProcessInfo.processInfo.environment["SNES_ROM"] {
@@ -174,7 +189,10 @@ final class EmulatorViewModel: ObservableObject {
             restoreSavedState()
 
             RecentROMs.shared.remember(url: url, title: romTitle)
+            online.gameTitleChanged(romTitle)
             applyRunState()
+            // SNES_HOST=1 abre a sessão junto com a ROM (teste sem clicar).
+            if ProcessInfo.processInfo.environment["SNES_HOST"] != nil { startHosting() }
         } catch {
             errorText = "Erro ao carregar ROM: \(error.localizedDescription)"
             isROMLoaded = false
@@ -184,6 +202,7 @@ final class EmulatorViewModel: ObservableObject {
     /// Volta à biblioteca: salva o progresso e descarrega a ROM.
     func ejectROM() {
         guard isROMLoaded else { return }
+        online.stopHosting()
         saveSRAMIfNeeded()
         suspendEmulation()
         isROMLoaded = false
@@ -192,6 +211,25 @@ final class EmulatorViewModel: ObservableObject {
         history.clear()
         romTitle = ""
         errorText = nil
+    }
+
+    // MARK: - Online
+
+    func startHosting() {
+        guard isROMLoaded else { return }
+        online.startHosting(gameTitle: romTitle)
+    }
+
+    /// Liga/desliga o multitap e o tap de áudio conforme a sessão.
+    private func syncHosting() {
+        let hosting = online.isHosting
+        guard hosting != snes.multitap else { return }
+        snes.multitap = hosting
+        snes.onAudioSamples = hosting
+            ? { [weak self] left, right in
+                MainActor.assumeIsolated { self?.online.hostDidProduceAudio(left: left, right: right) }
+            }
+            : nil
     }
 
     func loadRecent(_ entry: RecentROMs.Entry) {
@@ -344,6 +382,9 @@ final class EmulatorViewModel: ObservableObject {
         let cgImage = snes.ppu.getFrameImage()
         if let cgImage {
             frameSource.publish(cgImage)
+        }
+        if online.isHosting {
+            snes.ppu.withFrameBuffer { online.hostDidRunFrame(rgba: $0) }
         }
         frameCount += 1
         history.frameDidRun { (snes.saveState(), cgImage) }

@@ -29,6 +29,8 @@ final class NotchPresenter: ObservableObject {
     @Published var hasGamepad = false
     /// Sem ROM o painel fica sempre aberto.
     @Published var hasROM = false
+    /// Transmitindo para convidados: o jogo não pode parar quando o painel recolhe.
+    @Published var isHosting = false
     /// App ativo (painel com foco). Atualizado pelo controller via notificações.
     @Published var isAppActive = false
     /// Cursor sobre o painel, sem atraso: a sombra reage antes de o painel abrir.
@@ -55,7 +57,7 @@ final class NotchPresenter: ObservableObject {
         return isPinned || (isExpanded && hasROM)
     }
     /// O jogo só roda com o painel aberto (ou se a pausa automática estiver desligada).
-    var shouldRun: Bool { hasROM && (isOpen || !settings.pauseOnHide) }
+    var shouldRun: Bool { hasROM && (isOpen || isHosting || !settings.pauseOnHide) }
 
     private var hoverWorkItem: DispatchWorkItem?
     /// Último lado informado pelo monitor, antes do atraso.
