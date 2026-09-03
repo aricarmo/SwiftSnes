@@ -60,6 +60,13 @@ final class AudioOutput {
     // MARK: - Ciclo de vida
 
     func start() {
+        // Retomada no meio do fade-out: cancela o stop pendente e devolve o
+        // volume, senão o start é ignorado e o stop agendado silencia a engine.
+        if isRunning, fadeTimer != nil {
+            fadeTimer?.invalidate()
+            fadeTimer = nil
+            engine?.mainMixerNode.outputVolume = 1
+        }
         guard !isRunning else { return }
 
         let engine = AVAudioEngine()
@@ -109,10 +116,11 @@ final class AudioOutput {
             mixer.outputVolume = Float(max(0, remaining)) / Float(steps)
             if remaining <= 0 {
                 timer.invalidate()
-                DispatchQueue.main.async {
-                    self?.fadeTimer = nil
-                    self?.stop()
-                }
+                // Só para se este ainda for o fade vigente: um `start()` no
+                // meio do caminho já cancelou e restaurou o volume.
+                guard let self, self.fadeTimer === timer else { return }
+                self.fadeTimer = nil
+                self.stop()
             }
         }
         fadeTimer = timer
