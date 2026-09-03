@@ -54,7 +54,10 @@ struct GameBody: View {
                             onSelect: vm.rewindSelect, onConfirm: vm.rewindConfirm, onCancel: vm.rewindCancel)
             }
 
+            // Mesma largura da tela: sem isso o nome do gamepad alarga a barra
+            // além do painel e os botões da direita saem cortados.
             ControlsBar(vm: vm, presenter: presenter, gamepad: gamepad)
+                .frame(width: videoSize.width)
         }
         .padding(.horizontal, NotchMetrics.contentPadding)
         .padding(.top, 6)
@@ -413,6 +416,7 @@ private struct ControlsBar: View {
                     Text(gamepad.name)
                         .font(.system(size: 11))
                         .lineLimit(1)
+                        .truncationMode(.tail)
                         .foregroundStyle(NotchPalette.primaryText.opacity(0.72))
                 }
                 .padding(.trailing, 4)

@@ -35,6 +35,9 @@ enum NotchMetrics {
     /// para três cartuchos caberem lado a lado com folga.
     static let libraryBodyWidth: CGFloat = 664
     static let libraryCarouselHeight: CGFloat = 236
+    /// Faixa entre o carrossel e o rodapé (nome do jogo e pontos): a cena 3D
+    /// cobre essa faixa também, para o cartucho encaixar rente ao rodapé.
+    static let librarySlotHeight: CGFloat = 55
 
     /// Miniatura do tamanho de tela nos ajustes: largura do corpo interpola
     /// entre o vídeo compacto (356 pt) e o cinema (768 pt).

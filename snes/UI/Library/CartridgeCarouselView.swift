@@ -60,15 +60,38 @@ struct CartridgeCarouselView: NSViewRepresentable {
         private var tilt = CGPoint.zero
         private var lastSelected = -1
 
+        // A view vai até o rodapé, por baixo do nome e dos pontos, para o
+        // cartucho encaixado não parar no meio de uma faixa preta. A câmera
+        // compensa: o carrossel fica onde ficaria numa view só da altura dele.
+        private static let cameraZ: CGFloat = 24
+        private static let frontZ: CGFloat = 3
+        /// Campo de visão vertical que o carrossel teria sozinho.
+        private static let baseFOV: CGFloat = 30 * .pi / 180
+        private static var fieldOfView: CGFloat {
+            let ratio = (NotchMetrics.libraryCarouselHeight + NotchMetrics.librarySlotHeight) / NotchMetrics.libraryCarouselHeight
+            return 2 * atan(tan(baseFOV / 2) * ratio)
+        }
+        /// Desce a câmera o equivalente à metade da área extra, medido no plano do cartucho da frente.
+        private static var cameraY: CGFloat {
+            let unitsPerPoint = (cameraZ - frontZ) * tan(baseFOV / 2) / (NotchMetrics.libraryCarouselHeight / 2)
+            return 0.5 - NotchMetrics.librarySlotHeight / 2 * unitsPerPoint
+        }
+        /// Altura em que o cartucho encaixado para: só 2 cm dele acima da borda de baixo da view.
+        static var slotY: CGFloat {
+            let bottom = cameraY - (cameraZ - 7) * tan(fieldOfView / 2)
+            return bottom + 2 - CartridgeModel.height / 2 * 1.08
+        }
+
         init() {
             scene.background.contents = nil
             let camera = SCNCamera()
-            camera.fieldOfView = 30
+            camera.projectionDirection = .vertical
+            camera.fieldOfView = Self.fieldOfView * 180 / .pi
             camera.wantsHDR = false
             camera.zNear = 1
             camera.zFar = 200
             cameraNode.camera = camera
-            cameraNode.position = SCNVector3(0, 0.5, 24)
+            cameraNode.position = SCNVector3(0, Self.cameraY, Self.cameraZ)
             scene.rootNode.addChildNode(cameraNode)
 
             addLight(.directional, intensity: 1000, at: SCNVector3(-8, 16, 20), color: .white, shadows: true)
@@ -160,17 +183,26 @@ struct CartridgeCarouselView: NSViewRepresentable {
         /// Encaixe no console: o cartucho vem para a frente, de pé, enquanto os
         /// outros somem; depois desce pelo pé da tela como se entrasse no slot.
         private func insert(_ node: SCNNode, others: [SCNNode]) {
-            // Uma volta completa no lugar, para mostrar que é 3D de verdade.
-            // SCNAction e não SCNTransaction: a transação interpola rotação
-            // como quaternion, e 2π é o mesmo que 0 (não gira nada).
             SCNTransaction.begin()
             SCNTransaction.animationDuration = 0.3
             for other in others { other.opacity = 0 }
             SCNTransaction.commit()
-            let spin = SCNAction.rotateBy(x: 0, y: 2 * .pi, z: 0, duration: 0.7)
+            // Uma volta completa no lugar, para mostrar que é 3D de verdade.
+            // SCNAction e não SCNTransaction: a transação interpola rotação
+            // como quaternion, e 2π é o mesmo que 0 (não gira nada). Sem
+            // o arco mais curto a ação vai pelos ângulos de Euler mesmo:
+            // desfaz a inclinação do stick e chega de frente em y = 2π.
+            let spin = SCNAction.rotateTo(x: 0.06, y: 2 * .pi, z: 0, duration: 0.7, usesShortestUnitArc: false)
             spin.timingMode = .easeInEaseOut
             node.runAction(spin) {
                 DispatchQueue.main.async {
+                    // Mesma orientação, sem o 2π acumulado: senão a transação
+                    // seguinte "volta" uma volta inteira para a esquerda.
+                    SCNTransaction.begin()
+                    SCNTransaction.animationDuration = 0
+                    node.eulerAngles = SCNVector3(0.06, 0, 0)
+                    SCNTransaction.commit()
+
                     SCNTransaction.begin()
                     SCNTransaction.animationDuration = 0.4
                     SCNTransaction.animationTimingFunction = CAMediaTimingFunction(controlPoints: 0.22, 1, 0.36, 1)
@@ -178,12 +210,12 @@ struct CartridgeCarouselView: NSViewRepresentable {
                     node.scale = SCNVector3(1.08, 1.08, 1.08)
                     node.eulerAngles = SCNVector3(0, 0, 0)
                     SCNTransaction.completionBlock = {
-                        // Desce até ficar quase todo dentro do slot (só a borda de
-                        // cima aparece) e para ali; o jogo entra por cima.
+                        // Desce até encostar no rodapé com só a borda de cima
+                        // aparecendo e para ali; o jogo entra por cima.
                         SCNTransaction.begin()
                         SCNTransaction.animationDuration = 0.45
                         SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-                        node.position = SCNVector3(0, -6.8, 7)
+                        node.position = SCNVector3(0, Coordinator.slotY, 7)
                         node.eulerAngles = SCNVector3(0.12, 0, 0)
                         SCNTransaction.commit()
                     }
