@@ -3,6 +3,17 @@
     <channel>
         <title>NotchSnes</title>
         <item>
+            <title>2.1</title>
+            <pubDate>Thu, 03 Sep 2026 21:58:25 -0300</pubDate>
+            <link>https://aricarmo.github.io/SwiftSnes/</link>
+            <sparkle:fullReleaseNotesLink>https://github.com/aricarmo/SwiftSnes/releases/tag/v2.1</sparkle:fullReleaseNotesLink>
+            <sparkle:version>41</sparkle:version>
+            <sparkle:shortVersionString>2.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.4</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/aricarmo/SwiftSnes/releases/download/v2.1/NotchSnes.dmg" length="14071550" type="application/octet-stream" sparkle:edSignature="z+hs4eHyNAefMOP2wO44kuuCtVRPvkNxmqiaxIGycz0W56rr7Al8sdHyH+BhCcW/oF+heTq9LiUKp2rPsDH8Ag=="/>
+        </item>
+        <item>
             <title>2.0</title>
             <pubDate>Thu, 03 Sep 2026 17:29:31 -0300</pubDate>
             <link>https://aricarmo.github.io/SwiftSnes/</link>
