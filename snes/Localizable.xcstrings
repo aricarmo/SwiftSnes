@@ -1,0 +1,973 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "%lld FPS": {
+      "shouldTranslate": false
+    },
+    "%lld games · recent first, then A–Z": {
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld game · recent first, then A–Z"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld games · recent first, then A–Z"
+                }
+              }
+            }
+          }
+        },
+        "pt-BR": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld jogo · recentes primeiro, depois A–Z"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld jogos · recentes primeiro, depois A–Z"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld%%": {
+      "shouldTranslate": false
+    },
+    "%lld×%lld": {
+      "shouldTranslate": false
+    },
+    ".SFC  .SMC  .FIG": {
+      "shouldTranslate": false
+    },
+    "150 ms when pausing, avoids buffer pops": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "150 ms ao pausar, evita estalo no buffer"
+          }
+        }
+      }
+    },
+    "2.5× the SNES video. Only the screen widens; the notch strip stays.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2,5× o vídeo do SNES. Só a tela alarga; a faixa do notch não muda."
+          }
+        }
+      }
+    },
+    "2× the SNES video. Only the screen widens; the notch strip stays.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2× o vídeo do SNES. Só a tela alarga; a faixa do notch não muda."
+          }
+        }
+      }
+    },
+    "3× the SNES video. Only the screen widens; the notch strip stays.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3× o vídeo do SNES. Só a tela alarga; a faixa do notch não muda."
+          }
+        }
+      }
+    },
+    "Analog stick as d-pad": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analógico como direcional"
+          }
+        }
+      }
+    },
+    "Audio fade": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fade de áudio"
+          }
+        }
+      }
+    },
+    "BEHAVIOR": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "COMPORTAMENTO"
+          }
+        }
+      }
+    },
+    "Back to library": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voltar à biblioteca"
+          }
+        }
+      }
+    },
+    "Bluetooth or USB": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bluetooth ou USB"
+          }
+        }
+      }
+    },
+    "Button %lld": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Botão %lld"
+          }
+        }
+      }
+    },
+    "CONTROLS": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CONTROLES"
+          }
+        }
+      }
+    },
+    "CRT glass": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vidro CRT"
+          }
+        }
+      }
+    },
+    "Cancel": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelar"
+          }
+        }
+      }
+    },
+    "Change…": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trocar…"
+          }
+        }
+      }
+    },
+    "Check": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verificar"
+          }
+        }
+      }
+    },
+    "Checking…": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verificando…"
+          }
+        }
+      }
+    },
+    "Choose your ROM folder": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolha a pasta das suas ROMs"
+          }
+        }
+      }
+    },
+    "Choose your ROM folder…": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolher a pasta das suas ROMs…"
+          }
+        }
+      }
+    },
+    "Choose…": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolher…"
+          }
+        }
+      }
+    },
+    "Cinema": {
+      "shouldTranslate": false
+    },
+    "Clean": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Limpo"
+          }
+        }
+      }
+    },
+    "Compact": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compacto"
+          }
+        }
+      }
+    },
+    "Corrupt zip": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zip corrompido"
+          }
+        }
+      }
+    },
+    "Couldn't check for updates": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível verificar"
+          }
+        }
+      }
+    },
+    "Couldn't load ROM: %@": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erro ao carregar ROM: %@"
+          }
+        }
+      }
+    },
+    "Couldn't read the ROM file": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Falha ao ler o arquivo da ROM"
+          }
+        }
+      }
+    },
+    "Couldn't reopen %@": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível reabrir %@"
+          }
+        }
+      }
+    },
+    "D-pad": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Direcional"
+          }
+        }
+      }
+    },
+    "Download": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baixar"
+          }
+        }
+      }
+    },
+    "Download %@": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Baixar %@"
+          }
+        }
+      }
+    },
+    "Drop a ROM here": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arraste uma ROM aqui"
+          }
+        }
+      }
+    },
+    "Fits the notch width, as always.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cabe na largura do notch, como sempre."
+          }
+        }
+      }
+    },
+    "GAMES": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "JOGOS"
+          }
+        }
+      }
+    },
+    "Gamepad": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Controle"
+          }
+        }
+      }
+    },
+    "Ignores hover, expands only when clicked": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ignora hover, expande apenas ao clicar"
+          }
+        }
+      }
+    },
+    "Its games show up in the library": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Os jogos dela entram na biblioteca"
+          }
+        }
+      }
+    },
+    "Keyboard": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Teclado"
+          }
+        }
+      }
+    },
+    "LAST 10 SECONDS": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ÚLTIMOS 10 SEGUNDOS"
+          }
+        }
+      }
+    },
+    "Large": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grande"
+          }
+        }
+      }
+    },
+    "Left stick also moves the d-pad": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alavanca esquerda também move o d-pad"
+          }
+        }
+      }
+    },
+    "Load ROM…": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Carregar ROM…"
+          }
+        }
+      }
+    },
+    "MUTE": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MUDO"
+          }
+        }
+      }
+    },
+    "Medium": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Médio"
+          }
+        }
+      }
+    },
+    "New version %@": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nova versão %@"
+          }
+        }
+      }
+    },
+    "No ROM folder": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhuma pasta de ROMs"
+          }
+        }
+      }
+    },
+    "No SNES ROM (.sfc/.smc) inside the zip": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhuma ROM de SNES (.sfc/.smc) dentro do zip"
+          }
+        }
+      }
+    },
+    "No gamepad": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhum controle"
+          }
+        }
+      }
+    },
+    "Not checked yet": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ainda não verificado"
+          }
+        }
+      }
+    },
+    "NotchSnes": {
+      "shouldTranslate": false
+    },
+    "NotchSnes %@ available": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NotchSnes %@ disponível"
+          }
+        }
+      }
+    },
+    "Old TV effect": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Efeito TV antiga"
+          }
+        }
+      }
+    },
+    "Open file…": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir arquivo…"
+          }
+        }
+      }
+    },
+    "Open on click only": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abrir só com clique"
+          }
+        }
+      }
+    },
+    "PAUSED": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PAUSADO"
+          }
+        }
+      }
+    },
+    "Pause when collapsed": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pausar ao recolher"
+          }
+        }
+      }
+    },
+    "Phosphor": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fósforo"
+          }
+        }
+      }
+    },
+    "Pin panel": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fixar painel"
+          }
+        }
+      }
+    },
+    "Pure pixels, no post-processing.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pixel puro, sem pós-processamento."
+          }
+        }
+      }
+    },
+    "Quit": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sair"
+          }
+        }
+      }
+    },
+    "RGB phosphor grid with localized bleed.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grade de fósforo RGB com sangria localizada."
+          }
+        }
+      }
+    },
+    "Reset controls": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurar controles"
+          }
+        }
+      }
+    },
+    "Resuming from %@": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continuando de %@"
+          }
+        }
+      }
+    },
+    "Rewind": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voltar no tempo"
+          }
+        }
+      }
+    },
+    "Rewind here": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voltar aqui"
+          }
+        }
+      }
+    },
+    "SCREEN": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "TELA"
+          }
+        }
+      }
+    },
+    "Scanlines": {
+      "shouldTranslate": false
+    },
+    "Select a SNES ROM": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selecione uma ROM de SNES"
+          }
+        }
+      }
+    },
+    "Settings": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajustes"
+          }
+        }
+      }
+    },
+    "Sharp pixels with subtle scanlines.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pixels nítidos com linhas de varredura sutis."
+          }
+        }
+      }
+    },
+    "Simulates a CRT: scanlines, curvature and phosphor": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Simula tela de tubo: scanlines, curvatura e fósforo"
+          }
+        }
+      }
+    },
+    "Start over": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Começar do zero"
+          }
+        }
+      }
+    },
+    "Suspends CPU, PPU and APU when the panel closes": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suspende CPU, PPU e APU quando o painel fecha"
+          }
+        }
+      }
+    },
+    "The file doesn't look like a valid SNES ROM": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arquivo não parece ser uma ROM de SNES válida"
+          }
+        }
+      }
+    },
+    "The file is not a valid zip": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O arquivo não é um zip válido"
+          }
+        }
+      }
+    },
+    "Trinitron": {
+      "shouldTranslate": false
+    },
+    "Trinitron-style phosphor stripes, strong glow.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Barras de fósforo estilo Trinitron, brilho forte."
+          }
+        }
+      }
+    },
+    "Tube curvature, mask, bloom and vignette.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Curvatura, máscara, brilho e vinheta de tubo."
+          }
+        }
+      }
+    },
+    "UPDATES": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ATUALIZAÇÃO"
+          }
+        }
+      }
+    },
+    "USB gamepad": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Controle USB"
+          }
+        }
+      }
+    },
+    "Unpin panel": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Soltar painel"
+          }
+        }
+      }
+    },
+    "Unsupported zip compression (method %u)": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compressão não suportada no zip (método %u)"
+          }
+        }
+      }
+    },
+    "Use Folder": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar pasta"
+          }
+        }
+      }
+    },
+    "You're on the latest version · %@": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Você está na versão mais recente · %@"
+          }
+        }
+      }
+    },
+    "arrows": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "setas"
+          }
+        }
+      }
+    },
+    "becomes the library": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "vira a biblioteca"
+          }
+        }
+      }
+    },
+    "browse": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "navegar"
+          }
+        }
+      }
+    },
+    "connected": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "conectado"
+          }
+        }
+      }
+    },
+    "key %u": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tecla %u"
+          }
+        }
+      }
+    },
+    "none": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "nenhum"
+          }
+        }
+      }
+    },
+    "now": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "agora"
+          }
+        }
+      }
+    },
+    "play": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "jogar"
+          }
+        }
+      }
+    },
+    "press…": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pressione…"
+          }
+        }
+      }
+    },
+    "space": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "espaço"
+          }
+        }
+      }
+    },
+    "v%@": {
+      "shouldTranslate": false
+    },
+    "← → pick · ⇧ fine-tune · ↩ / B rewind · esc / A cancel": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "← → escolhe · ⇧ ajuste fino · ↩ / B volta · esc / A cancela"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

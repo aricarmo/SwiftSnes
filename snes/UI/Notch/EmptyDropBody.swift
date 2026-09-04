@@ -24,11 +24,11 @@ struct EmptyDropBody: View {
                     Image(systemName: "folder")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(NotchPalette.accentSoft)
-                    Text("Escolher a pasta das suas ROMs…")
+                    Text("Choose your ROM folder…")
                         .font(.system(size: 12))
                         .foregroundStyle(NotchPalette.primaryText.opacity(0.85))
                     Spacer()
-                    Text("vira a biblioteca")
+                    Text("becomes the library")
                         .font(.system(size: 9.5))
                         .foregroundStyle(NotchPalette.primaryText.opacity(0.35))
                 }
@@ -64,11 +64,11 @@ struct UpdateAvailableRow: View {
                 Image(systemName: "arrow.down.to.line")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(NotchPalette.accentSoft)
-                Text("NotchSnes \(version) disponível")
+                Text("NotchSnes \(version) available")
                     .font(.system(size: 12))
                     .foregroundStyle(NotchPalette.primaryText.opacity(0.9))
                 Spacer()
-                Text("Baixar")
+                Text("Download")
                     .font(.system(size: 11))
                     .foregroundStyle(NotchPalette.accentBright)
             }
@@ -103,7 +103,7 @@ private struct DropZone: View {
                     Image(systemName: "arrow.down.doc")
                         .font(.system(size: 24, weight: .light))
                         .foregroundStyle(NotchPalette.accentSoft)
-                    Text("Arraste uma ROM aqui")
+                    Text("Drop a ROM here")
                         .font(.system(size: 12.5))
                         .foregroundStyle(NotchPalette.primaryText.opacity(0.78))
                     Text(".SFC  .SMC  .FIG")
@@ -119,9 +119,9 @@ private struct DropZone: View {
 
 /// Rótulo de seção em caixa alta, usado no vazio e nos ajustes.
 struct SectionLabel: View {
-    let text: String
+    let text: LocalizedStringKey
 
-    init(_ text: String) { self.text = text }
+    init(_ text: LocalizedStringKey) { self.text = text }
 
     var body: some View {
         Text(text)

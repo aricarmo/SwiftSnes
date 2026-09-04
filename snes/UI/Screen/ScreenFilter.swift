@@ -10,21 +10,21 @@ enum ScreenFilter: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .clean: return "Limpo"
-        case .scanlines: return "Scanlines"
-        case .crt: return "Vidro CRT"
-        case .phosphor: return "Fósforo"
-        case .phosphorHot: return "Trinitron"
+        case .clean: return String(localized: "Clean")
+        case .scanlines: return String(localized: "Scanlines")
+        case .crt: return String(localized: "CRT glass")
+        case .phosphor: return String(localized: "Phosphor")
+        case .phosphorHot: return String(localized: "Trinitron")
         }
     }
 
     var detail: String {
         switch self {
-        case .clean: return "Pixel puro, sem pós-processamento."
-        case .scanlines: return "Pixels nítidos com linhas de varredura sutis."
-        case .crt: return "Curvatura, máscara, brilho e vinheta de tubo."
-        case .phosphor: return "Grade de fósforo RGB com sangria localizada."
-        case .phosphorHot: return "Barras de fósforo estilo Trinitron, brilho forte."
+        case .clean: return String(localized: "Pure pixels, no post-processing.")
+        case .scanlines: return String(localized: "Sharp pixels with subtle scanlines.")
+        case .crt: return String(localized: "Tube curvature, mask, bloom and vignette.")
+        case .phosphor: return String(localized: "RGB phosphor grid with localized bleed.")
+        case .phosphorHot: return String(localized: "Trinitron-style phosphor stripes, strong glow.")
         }
     }
 }

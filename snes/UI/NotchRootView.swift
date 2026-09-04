@@ -159,13 +159,13 @@ struct NotchRootView: View {
 
     @ViewBuilder
     private func contextMenuItems() -> some View {
-        Button(presenter.isPinned ? "Soltar painel" : "Fixar painel", action: presenter.togglePin)
-        Button("Carregar ROM…", action: vm.showFileDialog)
+        Button(presenter.isPinned ? "Unpin panel" : "Pin panel", action: presenter.togglePin)
+        Button("Load ROM…", action: vm.showFileDialog)
         if vm.isROMLoaded {
-            Button("Voltar à biblioteca", action: vm.ejectROM)
+            Button("Back to library", action: vm.ejectROM)
         }
         Divider()
-        Button("Sair", action: onQuit)
+        Button("Quit", action: onQuit)
     }
 
     // MARK: - Ações

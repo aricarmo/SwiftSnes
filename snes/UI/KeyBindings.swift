@@ -25,7 +25,7 @@ struct SNESButton: Identifiable, Hashable {
     static let select = SNESButton(id: "select", label: "Select",    mask: 0x2000)
     /// Não é um botão do console: abre a fita de voltar no tempo. Máscara zero,
     /// então nunca chega ao joypad.
-    static let rewind = SNESButton(id: "rewind", label: "Voltar no tempo", mask: 0)
+    static let rewind = SNESButton(id: "rewind", label: String(localized: "Rewind"), mask: 0)
 
     static let all: [SNESButton] = [up, down, left, right, a, b, x, y, l, r, start, select, rewind]
     /// Ordem exibida no painel de ajustes, em duas colunas.
@@ -104,12 +104,12 @@ final class KeyBindings: ObservableObject {
     /// Nome curto e legível de um keyCode.
     static func name(for keyCode: UInt16) -> String {
         if let special = specialNames[keyCode] { return special }
-        return literal(for: keyCode) ?? "tecla \(keyCode)"
+        return literal(for: keyCode) ?? String(localized: "key \(keyCode)")
     }
 
     private static let specialNames: [UInt16: String] = [
         126: "↑", 125: "↓", 123: "←", 124: "→",
-        36: "return", 49: "espaço", 48: "tab", 53: "esc",
+        36: "return", 49: String(localized: "space"), 48: "tab", 53: "esc",
         51: "delete", 117: "fwd del",
         56: "shift", 59: "control", 58: "option", 55: "command"
     ]

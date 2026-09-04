@@ -17,10 +17,10 @@ enum ROMArchive {
 
         var errorDescription: String? {
             switch self {
-            case .notAZip: return "O arquivo não é um zip válido"
-            case .noROMInside: return "Nenhuma ROM de SNES (.sfc/.smc) dentro do zip"
-            case .unsupportedMethod(let m): return "Compressão não suportada no zip (método \(m))"
-            case .corrupt: return "Zip corrompido"
+            case .notAZip: return String(localized: "The file is not a valid zip")
+            case .noROMInside: return String(localized: "No SNES ROM (.sfc/.smc) inside the zip")
+            case .unsupportedMethod(let m): return String(localized: "Unsupported zip compression (method \(m))")
+            case .corrupt: return String(localized: "Corrupt zip")
             }
         }
     }

@@ -30,7 +30,7 @@ enum GamepadElement: String, CaseIterable, Codable {
     /// Rótulo curto em layout Xbox / PlayStation, para quando o controle não
     /// informa o nome do próprio botão.
     var genericLabel: String {
-        if let index = hidIndex { return "Botão \(index)" }
+        if let index = hidIndex { return String(localized: "Button \(index)") }
         switch self {
         case .buttonA: return "A / ✕"
         case .buttonB: return "B / ○"
@@ -198,7 +198,7 @@ final class GamepadInput: ObservableObject {
     private var hidRewind = false
 
     var isConnected: Bool { controller != nil || hidName != nil }
-    var name: String { controller?.vendorName ?? hidName ?? "Controle" }
+    var name: String { controller?.vendorName ?? hidName ?? String(localized: "Gamepad") }
 
     static let stickDeadzone: Float = 0.5
     static let badgeDuration: TimeInterval = 2.0
@@ -222,7 +222,7 @@ final class GamepadInput: ObservableObject {
 
         hid.onConnect = { [weak self] in
             guard let self else { return }
-            hidName = hid.name ?? "Controle USB"
+            hidName = hid.name ?? String(localized: "USB gamepad")
             bindings.hidLayoutPreferred = controller == nil
             flashBadge()
         }

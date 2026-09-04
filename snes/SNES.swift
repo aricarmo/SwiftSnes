@@ -157,8 +157,8 @@ enum EmulatorError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .invalidROM:   return "Arquivo não parece ser uma ROM de SNES válida"
-        case .romLoadError: return "Falha ao ler o arquivo da ROM"
+        case .invalidROM:   return String(localized: "The file doesn't look like a valid SNES ROM")
+        case .romLoadError: return String(localized: "Couldn't read the ROM file")
         }
     }
 }

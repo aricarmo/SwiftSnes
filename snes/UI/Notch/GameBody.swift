@@ -107,13 +107,14 @@ private enum VolumeOSDRaster {
         "M": [0b101, 0b111, 0b101, 0b101, 0b101],
         "E": [0b111, 0b100, 0b110, 0b100, 0b111],
         "D": [0b110, 0b101, 0b101, 0b101, 0b110],
+        "T": [0b111, 0b010, 0b010, 0b010, 0b010],
     ]
 
     static func overlay(volume: Double, muted: Bool, alpha: Double) -> FrameOverlay {
         var px = [UInt8](repeating: 0, count: width * height * 4)
         let filled = muted ? 0 : min(blocks, Int((volume * Double(blocks)).rounded()))
 
-        let text = muted ? "MUDO" : "VOLUME"
+        let text = muted ? String(localized: "MUTE") : "VOLUME"
         drawText(text, into: &px, x: shadowOffset, y: shadowOffset, color: shadow)
         drawText(text, into: &px, x: 0, y: 0, color: green)
 
@@ -199,7 +200,7 @@ private struct RewindBadge: View {
     let seconds: Double
 
     var body: some View {
-        Text(seconds > -0.05 ? "agora" : String(format: "−%.1f s", -seconds))
+        Text(seconds > -0.05 ? String(localized: "now") : String(format: "−%.1f s", -seconds))
             .font(.system(size: 10.5))
             .monospacedDigit()
             .kerning(0.6)
@@ -250,16 +251,16 @@ private struct RewindStrip: View {
     var body: some View {
         VStack(spacing: 8) {
             HStack(spacing: 10) {
-                SectionLabel("ÚLTIMOS 10 SEGUNDOS")
+                SectionLabel("LAST 10 SECONDS")
                 Spacer(minLength: 0)
                 if width >= 480 {
-                    Text("← → escolhe · ⇧ ajuste fino · ↩ / B volta · esc / A cancela")
+                    Text("← → pick · ⇧ fine-tune · ↩ / B rewind · esc / A cancel")
                         .font(.system(size: 10))
                         .foregroundStyle(NotchPalette.primaryText.opacity(0.45))
                         .lineLimit(1)
                 }
-                StripButton(text: "Voltar aqui", prominent: true, action: onConfirm)
-                StripButton(text: "Cancelar", prominent: false, action: onCancel)
+                StripButton(text: "Rewind here", prominent: true, action: onConfirm)
+                StripButton(text: "Cancel", prominent: false, action: onCancel)
             }
 
             let items = thumbs
@@ -279,7 +280,7 @@ private struct RewindStrip: View {
                                                       lineWidth: selected ? 2 : 1)
                                 )
                                 .opacity(selected ? 1 : 0.55)
-                            Text(thumb.secondsAgo == 0 ? "agora" : String(format: "−%.0f s", thumb.secondsAgo))
+                            Text(thumb.secondsAgo == 0 ? String(localized: "now") : String(format: "−%.0f s", thumb.secondsAgo))
                                 .font(.system(size: 9.5))
                                 .foregroundStyle(selected ? NotchPalette.accentBright : NotchPalette.primaryText.opacity(0.4))
                         }
@@ -318,7 +319,7 @@ private struct ThumbImage: View {
 }
 
 private struct StripButton: View {
-    let text: String
+    let text: LocalizedStringKey
     let prominent: Bool
     let action: () -> Void
 
@@ -351,7 +352,6 @@ private struct ResumeNoticeRow: View {
 
     private static let formatter: RelativeDateTimeFormatter = {
         let f = RelativeDateTimeFormatter()
-        f.locale = Locale(identifier: "pt_BR")
         f.unitsStyle = .short
         return f
     }()
@@ -361,11 +361,11 @@ private struct ResumeNoticeRow: View {
             Image(systemName: "clock.arrow.circlepath")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(NotchPalette.accentSoft)
-            Text("Continuando de \(Self.formatter.localizedString(for: notice.savedAt, relativeTo: Date()))")
+            Text("Resuming from \(Self.formatter.localizedString(for: notice.savedAt, relativeTo: Date()))")
                 .font(.system(size: 11))
                 .foregroundStyle(NotchPalette.primaryText.opacity(0.9))
                 .lineLimit(1)
-            Button("Começar do zero", action: onRestart)
+            Button("Start over", action: onRestart)
                 .buttonStyle(.plain)
                 .font(.system(size: 11))
                 .foregroundStyle(NotchPalette.accentBright)

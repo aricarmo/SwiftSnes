@@ -24,19 +24,19 @@ enum ScreenSize: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .compact: return "Compacto"
-        case .medium: return "Médio"
-        case .large: return "Grande"
-        case .cinema: return "Cinema"
+        case .compact: return String(localized: "Compact")
+        case .medium: return String(localized: "Medium")
+        case .large: return String(localized: "Large")
+        case .cinema: return String(localized: "Cinema")
         }
     }
 
     var detail: String {
         switch self {
-        case .compact: return "Cabe na largura do notch, como sempre."
-        case .medium: return "2× o vídeo do SNES. Só a tela alarga; a faixa do notch não muda."
-        case .large: return "2,5× o vídeo do SNES. Só a tela alarga; a faixa do notch não muda."
-        case .cinema: return "3× o vídeo do SNES. Só a tela alarga; a faixa do notch não muda."
+        case .compact: return String(localized: "Fits the notch width, as always.")
+        case .medium: return String(localized: "2× the SNES video. Only the screen widens; the notch strip stays.")
+        case .large: return String(localized: "2.5× the SNES video. Only the screen widens; the notch strip stays.")
+        case .cinema: return String(localized: "3× the SNES video. Only the screen widens; the notch strip stays.")
         }
     }
 }

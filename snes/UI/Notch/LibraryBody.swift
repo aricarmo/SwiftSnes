@@ -94,18 +94,18 @@ struct LibraryBody: View {
     private var footer: some View {
         HStack(spacing: 14) {
             if gamepad.isConnected {
-                HintKey("◀ ▶", "navegar")
-                HintKey("A", "jogar")
+                HintKey("◀ ▶", "browse")
+                HintKey("A", "play")
             } else {
-                HintKey("← →", "navegar")
-                HintKey("↩", "jogar")
+                HintKey("← →", "browse")
+                HintKey("↩", "play")
             }
             Spacer()
             Button(action: vm.showFileDialog) {
                 HStack(spacing: 5) {
                     Image(systemName: "folder")
                         .font(.system(size: 9.5))
-                    Text("Abrir arquivo…")
+                    Text("Open file…")
                         .font(.system(size: 10.5))
                 }
                 .foregroundStyle(NotchPalette.primaryText.opacity(0.6))
@@ -136,9 +136,9 @@ private struct PageDots: View {
 
 private struct HintKey: View {
     let key: String
-    let label: String
+    let label: LocalizedStringKey
 
-    init(_ key: String, _ label: String) {
+    init(_ key: String, _ label: LocalizedStringKey) {
         self.key = key
         self.label = label
     }

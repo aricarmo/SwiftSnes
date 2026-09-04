@@ -38,7 +38,7 @@ struct NotchHeader: View {
         // Recolhido, avisa por alguns segundos que um controle acabou de parear.
         .overlay(alignment: .trailing) {
             if gamepad.justConnected && !presenter.showsHeader {
-                GamepadBadge(text: "conectado")
+                GamepadBadge(text: "connected")
                     .padding(.trailing, Self.horizontalPadding)
                     .transition(.opacity)
             }
@@ -58,7 +58,7 @@ private struct NotchHeaderLeading: View {
                 HStack(spacing: 5) {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 11, weight: .semibold))
-                    Text("Ajustes")
+                    Text("Settings")
                         .font(.system(size: 11))
                 }
                 .foregroundStyle(NotchPalette.primaryText.opacity(0.8))
@@ -123,7 +123,7 @@ private struct NotchHeaderTrailing: View {
             HStack(spacing: 6) {
                 Image(systemName: "pause.fill")
                     .font(.system(size: 9))
-                Text("PAUSADO")
+                Text("PAUSED")
                     .font(.system(size: 10.5))
             }
             .foregroundStyle(NotchPalette.primaryText.opacity(0.55))
@@ -168,7 +168,7 @@ private struct SpinningAppIcon: View {
 
 /// Ícone de controle com texto mono, no mesmo tom do FPS.
 struct GamepadBadge: View {
-    let text: String
+    let text: LocalizedStringKey
 
     var body: some View {
         HStack(spacing: 6) {

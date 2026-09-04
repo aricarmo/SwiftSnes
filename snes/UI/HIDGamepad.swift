@@ -95,7 +95,7 @@ final class HIDGamepad {
         name = product?
             .split(separator: " ")
             .joined(separator: " ")
-        if name?.isEmpty != false { name = "Controle USB" }
+        if name?.isEmpty != false { name = String(localized: "USB gamepad") }
         onConnect?()
     }
 

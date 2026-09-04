@@ -7,7 +7,7 @@ import SwiftUI
 enum InputSource: String, CaseIterable, Identifiable {
     case keyboard, gamepad
     var id: String { rawValue }
-    var label: String { self == .keyboard ? "Teclado" : "Controle" }
+    var label: String { self == .keyboard ? String(localized: "Keyboard") : String(localized: "Gamepad") }
 }
 
 struct SettingsBody: View {
@@ -31,7 +31,7 @@ struct SettingsBody: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack {
-                SectionLabel("CONTROLES")
+                SectionLabel("CONTROLS")
                 Spacer()
                 SourcePicker(source: $source)
             }
@@ -45,17 +45,17 @@ struct SettingsBody: View {
                                isRebinding: isRebinding(button),
                                onTap: { toggleRebinding(button) })
                 }
-                DirectionRow(text: source == .keyboard ? "setas" : "d-pad")
+                DirectionRow(text: source == .keyboard ? String(localized: "arrows") : "d-pad")
             }
 
             if source == .gamepad {
-                SettingToggleRow(title: "Analógico como direcional",
-                                 detail: "Alavanca esquerda também move o d-pad",
+                SettingToggleRow(title: "Analog stick as d-pad",
+                                 detail: "Left stick also moves the d-pad",
                                  isOn: $settings.analogAsDpad)
             }
 
             Divider().overlay(NotchPalette.divider)
-            SectionLabel("TELA")
+            SectionLabel("SCREEN")
 
             LazyVGrid(columns: Self.sizeColumns, spacing: 6) {
                 ForEach(ScreenSize.allCases) { size in
@@ -71,8 +71,8 @@ struct SettingsBody: View {
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
 
-            SettingToggleRow(title: "Efeito TV antiga",
-                             detail: "Simula tela de tubo: scanlines, curvatura e fósforo",
+            SettingToggleRow(title: "Old TV effect",
+                             detail: "Simulates a CRT: scanlines, curvature and phosphor",
                              isOn: Binding(get: { settings.retroEffectEnabled },
                                            set: { settings.retroEffectEnabled = $0 }))
             if settings.retroEffectEnabled {
@@ -91,33 +91,33 @@ struct SettingsBody: View {
             }
 
             Divider().overlay(NotchPalette.divider)
-            SectionLabel("JOGOS")
+            SectionLabel("GAMES")
             ROMFolderRow(folder: folder, onChoose: onChooseFolder, onClear: folder.clear)
 
             Divider().overlay(NotchPalette.divider)
-            SectionLabel("COMPORTAMENTO")
+            SectionLabel("BEHAVIOR")
 
-            SettingToggleRow(title: "Pausar ao recolher",
-                             detail: "Suspende CPU, PPU e APU quando o painel fecha",
+            SettingToggleRow(title: "Pause when collapsed",
+                             detail: "Suspends CPU, PPU and APU when the panel closes",
                              isOn: $settings.pauseOnHide)
-            SettingToggleRow(title: "Fade de áudio",
-                             detail: "150 ms ao pausar, evita estalo no buffer",
+            SettingToggleRow(title: "Audio fade",
+                             detail: "150 ms when pausing, avoids buffer pops",
                              isOn: $settings.audioFade)
-            SettingToggleRow(title: "Abrir só com clique",
-                             detail: "Ignora hover, expande apenas ao clicar",
+            SettingToggleRow(title: "Open on click only",
+                             detail: "Ignores hover, expands only when clicked",
                              isOn: $settings.clickToOpen)
 
             Divider().overlay(NotchPalette.divider)
-            SectionLabel("ATUALIZAÇÃO")
+            SectionLabel("UPDATES")
             UpdateStatusRow(updater: updater)
 
             HStack {
-                Button("Restaurar controles", action: restoreDefaults)
+                Button("Reset controls", action: restoreDefaults)
                     .buttonStyle(.plain)
                     .font(.system(size: 11))
                     .foregroundStyle(NotchPalette.accentSoft)
                 Spacer()
-                Button("Sair", action: onQuit)
+                Button("Quit", action: onQuit)
                     .buttonStyle(.plain)
                     .font(.system(size: 11))
                     .foregroundStyle(NotchPalette.primaryText.opacity(0.5))
@@ -141,7 +141,7 @@ struct SettingsBody: View {
     private func label(for button: SNESButton) -> String {
         switch source {
         case .keyboard: return bindings.label(for: button)
-        case .gamepad: return padBindings.element(for: button)?.label(in: gamepad.controller) ?? "nenhum"
+        case .gamepad: return padBindings.element(for: button)?.label(in: gamepad.controller) ?? String(localized: "none")
         }
     }
 
@@ -213,19 +213,19 @@ private struct ROMFolderRow: View {
                 .font(.system(size: 11))
                 .foregroundStyle(folder.url != nil ? NotchPalette.accentSoft : Color.white.opacity(0.3))
             VStack(alignment: .leading, spacing: 1) {
-                Text(folder.displayPath ?? "Nenhuma pasta de ROMs")
+                Text(folder.displayPath ?? String(localized: "No ROM folder"))
                     .font(.system(size: 12))
                     .lineLimit(1)
                     .truncationMode(.middle)
                     .foregroundStyle(NotchPalette.primaryText.opacity(folder.url != nil ? 0.85 : 0.45))
                 Text(folder.url != nil
-                     ? "\(folder.files.count) jogos · recentes primeiro, depois A–Z"
-                     : "Os jogos dela entram na biblioteca")
+                     ? String(localized: "\(folder.files.count) games · recent first, then A–Z")
+                     : String(localized: "Its games show up in the library"))
                     .font(.system(size: 10))
                     .foregroundStyle(NotchPalette.primaryText.opacity(0.35))
             }
             Spacer(minLength: 6)
-            Button(folder.url == nil ? "Escolher…" : "Trocar…", action: onChoose)
+            Button(folder.url == nil ? "Choose…" : "Change…", action: onChoose)
                 .buttonStyle(.plain)
                 .font(.system(size: 11))
                 .foregroundStyle(NotchPalette.accentBright)
@@ -275,15 +275,15 @@ private struct GamepadStatusRow: View {
                     .fill(NotchPalette.running)
                     .frame(width: 6, height: 6)
                     .shadow(color: NotchPalette.running.opacity(0.7), radius: 3)
-                Text("conectado")
+                Text("connected")
                     .font(.system(size: 10))
                     .foregroundStyle(NotchPalette.primaryText.opacity(0.9))
             } else {
-                Text("Nenhum controle")
+                Text("No gamepad")
                     .font(.system(size: 12))
                     .foregroundStyle(NotchPalette.primaryText.opacity(0.45))
                 Spacer()
-                Text("Bluetooth ou USB")
+                Text("Bluetooth or USB")
                     .font(.system(size: 10.5))
                     .foregroundStyle(NotchPalette.primaryText.opacity(0.3))
             }
@@ -318,7 +318,7 @@ private struct BindingRow: View {
                     .foregroundStyle(isRebinding ? NotchPalette.accentBright
                                      : NotchPalette.primaryText.opacity(0.72))
                 Spacer()
-                KeyCap(text: isRebinding ? "pressione…" : keyLabel, highlighted: isRebinding)
+                KeyCap(text: isRebinding ? String(localized: "press…") : keyLabel, highlighted: isRebinding)
             }
             .padding(.horizontal, 10)
             .frame(height: 30)
@@ -341,7 +341,7 @@ private struct DirectionRow: View {
 
     var body: some View {
         HStack {
-            Text("Direcional")
+            Text("D-pad")
                 .font(.system(size: 12))
                 .foregroundStyle(NotchPalette.primaryText.opacity(0.72))
             Spacer()
@@ -456,21 +456,20 @@ private struct UpdateStatusRow: View {
     private var detail: (text: String, color: Color) {
         switch updater.state {
         case .idle:
-            return ("Ainda não verificado", NotchPalette.primaryText.opacity(0.4))
+            return (String(localized: "Not checked yet"), NotchPalette.primaryText.opacity(0.4))
         case .checking:
-            return ("Verificando…", NotchPalette.primaryText.opacity(0.4))
+            return (String(localized: "Checking…"), NotchPalette.primaryText.opacity(0.4))
         case .upToDate(let date):
             let ago = RelativeDateTimeFormatter()
-            ago.locale = Locale(identifier: "pt_BR")
             ago.unitsStyle = .short
-            return ("Você está na versão mais recente · \(ago.localizedString(for: date, relativeTo: Date()))",
+            return (String(localized: "You're on the latest version · \(ago.localizedString(for: date, relativeTo: Date()))"),
                     NotchPalette.primaryText.opacity(0.4))
         case .available(let release):
-            var text = "Nova versão \(release.version)"
+            var text = String(localized: "New version \(release.version)")
             if let summary = release.summary { text += " · \(summary)" }
             return (text, NotchPalette.accentBright)
         case .failed:
-            return ("Não foi possível verificar", NotchPalette.error)
+            return (String(localized: "Couldn't check for updates"), NotchPalette.error)
         }
     }
 
@@ -502,7 +501,7 @@ private struct UpdateStatusRow: View {
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.down.to.line")
                             .font(.system(size: 10, weight: .semibold))
-                        Text("Baixar \(release.version)")
+                        Text("Download \(release.version)")
                             .font(.system(size: 11))
                     }
                     .foregroundStyle(NotchPalette.accentBright)
@@ -519,7 +518,7 @@ private struct UpdateStatusRow: View {
                 }
                 .buttonStyle(.plain)
             default:
-                Button("Verificar", action: updater.check)
+                Button("Check", action: updater.check)
                     .buttonStyle(.plain)
                     .font(.system(size: 11))
                     .foregroundStyle(NotchPalette.accentSoft)
@@ -535,8 +534,8 @@ private struct UpdateStatusRow: View {
 }
 
 private struct SettingToggleRow: View {
-    let title: String
-    let detail: String
+    let title: LocalizedStringKey
+    let detail: LocalizedStringKey
     @Binding var isOn: Bool
 
     var body: some View {

@@ -108,7 +108,7 @@ final class EmulatorViewModel: ObservableObject {
         panel.allowedContentTypes = Self.romTypes
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        panel.title = "Selecione uma ROM de SNES"
+        panel.title = String(localized: "Select a SNES ROM")
 
         panel.begin { [weak self] response in
             guard let self else { return }
@@ -128,8 +128,8 @@ final class EmulatorViewModel: ObservableObject {
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
-        panel.title = "Escolha a pasta das suas ROMs"
-        panel.prompt = "Usar pasta"
+        panel.title = String(localized: "Choose your ROM folder")
+        panel.prompt = String(localized: "Use Folder")
 
         panel.begin { [weak self] response in
             guard let self else { return }
@@ -176,7 +176,7 @@ final class EmulatorViewModel: ObservableObject {
             RecentROMs.shared.remember(url: url, title: romTitle)
             applyRunState()
         } catch {
-            errorText = "Erro ao carregar ROM: \(error.localizedDescription)"
+            errorText = String(localized: "Couldn't load ROM: \(error.localizedDescription)")
             isROMLoaded = false
         }
     }
@@ -196,7 +196,7 @@ final class EmulatorViewModel: ObservableObject {
 
     func loadRecent(_ entry: RecentROMs.Entry) {
         guard let url = RecentROMs.shared.resolve(entry) else {
-            errorText = "Não foi possível reabrir \(entry.name)"
+            errorText = String(localized: "Couldn't reopen \(entry.name)")
             return
         }
         loadROM(from: url)
@@ -257,7 +257,7 @@ final class EmulatorViewModel: ObservableObject {
         if activityToken == nil {
             activityToken = ProcessInfo.processInfo.beginActivity(
                 options: [.userInitiated, .latencyCritical],
-                reason: "Emulação SNES rodando")
+                reason: "SNES emulation running")
         }
         // Zera a janela de medição: senão o primeiro FPS após retomar
         // divide os frames novos pelo tempo em que estava pausado.

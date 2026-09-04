@@ -25,7 +25,6 @@ final class RecentROMs: ObservableObject {
 
         private static let relativeFormatter: RelativeDateTimeFormatter = {
             let formatter = RelativeDateTimeFormatter()
-            formatter.locale = Locale(identifier: "pt_BR")
             formatter.unitsStyle = .short
             return formatter
         }()
